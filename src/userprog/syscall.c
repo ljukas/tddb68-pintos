@@ -5,6 +5,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/init.h"
+#include "lib/kernel/bitmap.h"
 
 static void syscall_handler (struct intr_frame *);
 static int get_four_user_bytes(const void * addr);
@@ -32,10 +33,6 @@ bool create(const char *file, unsigned initial_size) {
 int read(int fd, void *buffer, unsigned size) {
   //unsigned i = 0;
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
-    exit(-1);
-    NOT_REACHED();
-    return -1;
-  }
   if(fd >= BITMAPSIZE) return -1;
   struct thread *cur = thread_current();
   struct file *my_file = cur->file_list[fd];
@@ -47,6 +44,30 @@ int read(int fd, void *buffer, unsigned size) {
   }
   int lenght = (int) file_read(my_file, buffer, size);
   return lenght;
+  }
+}
+
+int open(const char* file) {
+  struct file *f;
+  
+  // Check that we are in uaddr and there are no segfaults
+  if(file >= PHYS_BASE || get_user(file) == -1) {
+    exit(-1);
+    NOT_REACHED();
+    return -1;
+  }
+  f = file_open(file);
+  if(!f) {
+    return -1;
+  }
+
+  //int fd = bitmap_scan_and_flip(thread_current()->fd_map, 2, 1, 0);
+  //if (fd == BITMAP_ERROR || STDIN_FILENO || STDOUT_FILENO) {
+  //  file_close(f);
+    //  return -1;
+    //}
+
+  return -1;
 }
 
 int write(int fd, const void *buffer, unsigned size) {
@@ -101,6 +122,9 @@ syscall_handler (struct intr_frame *f UNUSED)
   case SYS_HALT:
     halt();
     NOT_REACHED();
+  case SYS_EXIT:
+    exit(-1);
+    NOT_REACHED();
   case SYS_CREATE:
     f->eax = (uint32_t) create((const char *file) get_four_user_bytes(f->esp+4),
 			       (unsigned) get_four_user_bytes(f->esp+8));
@@ -109,15 +133,14 @@ syscall_handler (struct intr_frame *f UNUSED)
     f->eax = (uint32_t) read(get_four_user_bytes(f->esp+4),
 			      (const void*) get_four_user_bytes(f->esp+8),
 			      (unsigned) get_four_user_bytes(f->esp+12));
+  case SYS_OPEN:
+    f->eax = (uint32_t) open((const char*) get_four_user_bytes(f->esp+4));
     break;
   case SYS_WRITE:
     f->eax = (uint32_t) write(get_four_user_bytes(f->esp+4),
 			      (const void*) get_four_user_bytes(f->esp+8),
 			      (unsigned) get_four_user_bytes(f->esp+12));
     break;
-  case SYS_EXIT:
-    exit(-1);
-    NOT_REACHED();
   default:
     printf("Non-implemented syscall called for\n");
     thread_exit();

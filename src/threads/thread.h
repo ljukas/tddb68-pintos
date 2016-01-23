@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "lib/kernel/bitmap.h"
 
 /* LAB 1 */
 #define BITMAPSIZE 128
@@ -27,6 +28,10 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+/* Amount of files that a thread can open */
+#define FD_SIZE 128                     // Added lab 1
+
 
 /* A kernel thread or user process.
 
@@ -103,6 +108,8 @@ struct thread
 
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    /* File desriptors */
+    struct bitmap * fd_map;             // Added lab 1
 #endif
 
     /* Owned by thread.c. */
