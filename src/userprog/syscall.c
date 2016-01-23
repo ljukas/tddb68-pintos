@@ -21,11 +21,12 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-
+/* Halts pintos */
 void halt(void) {
   power_off();
 }
 
+/* Create a file */
 bool create(const char *file, unsigned initial_size) {
   if(file + initial_size - 1 >= PHYS_BASE || get_user(file + initial_size - 1) == -1) {
     exit(-1);
@@ -35,6 +36,7 @@ bool create(const char *file, unsigned initial_size) {
   return filesys_create(file, initial_size);
 }
 
+/* Read an open file */
 int read(int fd, void *buffer, unsigned size) {
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
     exit(-1);
@@ -43,12 +45,12 @@ int read(int fd, void *buffer, unsigned size) {
 
   int offset;
    
-  if(fd >= BITMAPSIZE) {
+  if(fd >= FD_SIZE) {
     return -1;
   }
   
   if(fd == STDIN_FILENO) {
-      for(offset = 0; offset < size; ++offset) {
+      for(offset = 0; offset != size; ++offset) {
 	*(uint8_t *)(buffer + offset) = input_getc();
       }
       return size;
@@ -64,6 +66,7 @@ int read(int fd, void *buffer, unsigned size) {
   return -1;
 }
 
+/* Open a created file */
 int open(const char* file) {
   struct file *f;
   
@@ -86,10 +89,15 @@ int open(const char* file) {
     return -1;
   }
 
+  // Put the open file in our file_list
+  struct thread *cur = thread_current();
+  cur->file_list[fd] = f;
+  
   // Return file descriptor
   return fd;
 }
 
+/* Write in an open file */
 int write(int fd, const void *buffer, unsigned size) {
   int retval = -1;
 
@@ -110,33 +118,19 @@ int write(int fd, const void *buffer, unsigned size) {
     putbuf((char*) (buffer + offset), (size_t) (size - offset));
     return size;
   }
+
+ struct thread *cur = thread_current(); 
+ retval = file_write(cur->file_list[fd], buffer, size);
   
-  // Missing code about writing to files
-  
-  return retval;
+ return retval;
 }
 
+/* Handle all syscalls */
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  /*
-  printf ("system call!\n");
-  printf ("You moma so fat!\n");
-
-  */
-  
-  // What to do next?
-  
-  /*
-    - Function for getting four bytes from the stack
-    - Make sure those four bytes are below PHYS_BASE
-    - Implement syscall HALT
-    - Implement syscall WRITE
-    - Implement the rest in any order we want
-   */
-
   int sys_call = get_four_user_bytes(f->esp);
-  printf("Executing syscall: %d\n", sys_call);
+  //printf("Executing syscall: %d\n", sys_call);
   
   switch(sys_call) {  
   case SYS_HALT:
@@ -153,6 +147,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     f->eax = (uint32_t) read(get_four_user_bytes(f->esp+4),
 			      (const void*) get_four_user_bytes(f->esp+8),
 			      (unsigned) get_four_user_bytes(f->esp+12));
+    break;
   case SYS_OPEN:
     f->eax = (uint32_t) open((const char*) get_four_user_bytes(f->esp+4));
     break;
@@ -162,7 +157,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			      (unsigned) get_four_user_bytes(f->esp+12));
     break;
   default:
-    printf("Non-implemented syscall called for\n");
+    printf("Non-implemented syscall called for - crash successful \n");
     thread_exit();
     break;
   }

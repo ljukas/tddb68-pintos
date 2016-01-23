@@ -6,10 +6,6 @@
 #include <stdint.h>
 #include "lib/kernel/bitmap.h"
 
-/* LAB 1 */
-#define BITMAPSIZE 128
-/* /LAB 1 */
-
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -102,9 +98,7 @@ struct thread
     struct list_elem elem;              /* List element. */
 
 #ifdef USERPROG
-    /* LAB 1 */
-    struct file *file_list[BITMAPSIZE];
-    /* /LAB 1 */
+    struct file *file_list[FD_SIZE];   // Added lab 1
 
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */

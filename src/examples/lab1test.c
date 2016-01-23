@@ -58,16 +58,17 @@ int main(void)
 	
   write(STDOUT_FILENO, test6, strlen(test6));
   num_bytes_read = read(STDIN_FILENO, sbuf, 10);
+  printf("Reached bigger penis\n");
   if(num_bytes_read != 10){
     printf("Did not read 10 characters from the console.\n");
     halt();
   }
-	
-  write(STDOUT_FILENO, test2, strlen(test2));
+  
+   write(STDOUT_FILENO, test2, strlen(test2));
   write(file[0], test3, strlen(test3));
   write(file[1], binarydata, 10);
-	
-  write(STDOUT_FILENO, test4, strlen(test4));
+
+   write(STDOUT_FILENO, test4, strlen(test4));
   close(file[0]);
   file[0] = open("test0");
   num_bytes_read = read(file[0], sbuf, 50);
