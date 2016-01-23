@@ -101,6 +101,15 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  /* Free resources for all open files */
+  int pos;
+  for(pos = 2; pos < FD_SIZE; pos++) {     // Added lab 1
+    if(bitmap(cur->fd_map, pos)) {
+      bitmap_reset(cur->fd_map, pos);
+      free(cur->file_list[pos]);
+    }
+  }
+  
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
