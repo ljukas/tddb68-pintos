@@ -25,6 +25,30 @@ void halt(void) {
   power_off();
 }
 
+bool create(const char *file, unsigned initial_size) {
+  return filesys_create(file, initial_size);
+}
+
+int read(int fd, void *buffer, unsigned size) {
+  //unsigned i = 0;
+  if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
+    exit(-1);
+    NOT_REACHED();
+    return -1;
+  }
+  if(fd >= BITMAPSIZE) return -1;
+  struct thread *cur = thread_current();
+  struct file *my_file = cur->file_list[fd];
+  if(fd == STDIN_FILENO) {
+      for(unsigned i = 0; i < size; ++i) {
+	  buffer[i] = input_getc();
+      }
+      return size;
+  }
+  int lenght = (int) file_read(my_file, buffer, size);
+  return lenght;
+}
+
 int write(int fd, const void *buffer, unsigned size) {
   int retval = -1;
 
@@ -77,14 +101,23 @@ syscall_handler (struct intr_frame *f UNUSED)
   case SYS_HALT:
     halt();
     NOT_REACHED();
+  case SYS_CREATE:
+    f->eax = (uint32_t) create((const char *file) get_four_user_bytes(f->esp+4),
+			       (unsigned) get_four_user_bytes(f->esp+8));
+    break;
+  case SYS_READ:
+    f->eax = (uint32_t) read(get_four_user_bytes(f->esp+4),
+			      (const void*) get_four_user_bytes(f->esp+8),
+			      (unsigned) get_four_user_bytes(f->esp+12));
+    break;
+  case SYS_WRITE:
+    f->eax = (uint32_t) write(get_four_user_bytes(f->esp+4),
+			      (const void*) get_four_user_bytes(f->esp+8),
+			      (unsigned) get_four_user_bytes(f->esp+12));
+    break;
   case SYS_EXIT:
     exit(-1);
     NOT_REACHED();
-  case SYS_WRITE:
-    f->eax = (uint32_t) write(get_four_user_bytes(f->esp+4),
-		   (const void*) get_four_user_bytes(f->esp+8),
-		   (unsigned) get_four_user_bytes(f->esp+12));
-    break;
   default:
     printf("Non-implemented syscall called for\n");
     thread_exit();
