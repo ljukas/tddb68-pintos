@@ -111,13 +111,18 @@ int open(const char* file) {
 int write(int fd, const void *buffer, unsigned size) {
   int retval = -1;
 
-  //Check that we are in uaddr and there are no segfaults
+  // Check that we are in uaddr and there are no segfaults
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
     exit(-1);
     NOT_REACHED();
     return -1;
   }
-
+  printf("step1");
+  // Make sure we dont try to write to a file with an index larger than the maximum allowed open programs
+  if(fd >= FD_SIZE) {
+     return -1;
+  }
+  printf("step2");
   // Write to console
   if(fd == STDOUT_FILENO) {
     size_t offset = 0;
@@ -128,11 +133,15 @@ int write(int fd, const void *buffer, unsigned size) {
     putbuf((char*) (buffer + offset), (size_t) (size - offset));
     return size;
   }
-
- struct thread *cur = thread_current(); 
- retval = file_write(cur->file_list[fd], buffer, size);
-  
- return retval;
+  printf("step3");
+  struct thread *cur = thread_current(); 
+  if(!bitmap_test(cur->fd_map, fd)) {
+    return retval;
+  }  
+  struct file *my_file = cur->file_list[fd];
+  retval = file_write(my_file, buffer, size);
+  printf("step4");
+  return retval;
 }
 
 /* Handle all syscalls */
