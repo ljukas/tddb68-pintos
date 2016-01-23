@@ -26,8 +26,8 @@ with you typing you can succeed in being a stripper, or even a programmer?\n";
     printf("Could not create test1\n");
     halt();
   }
-  
-  for(unsigned i = 0; i < 2; i++){
+  unsigned i;
+  for(i = 0; i < 2; i++){
     snprintf(sbuf, 50, "test%d", i);
     file[i] = open(sbuf);
     if(file[i] > 1){

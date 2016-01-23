@@ -36,6 +36,16 @@ bool create(const char *file, unsigned initial_size) {
   return filesys_create(file, initial_size);
 }
 
+/* Close a file if it is open */
+void close(int fd) {
+  struct thread *cur = thread_current();
+  if(!bitmap_test(cur->fd_map, fd)) {
+    struct file *my_file = cur->file_list[fd];
+    file_close(my_file);
+    bitmap_reset(cur->fd_map, fd);
+  }
+}
+
 /* Read an open file */
 int read(int fd, void *buffer, unsigned size) {
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
@@ -142,6 +152,9 @@ syscall_handler (struct intr_frame *f UNUSED)
   case SYS_CREATE:
     f->eax = (uint32_t) create((const char*) get_four_user_bytes(f->esp+4),
 			       (unsigned) get_four_user_bytes(f->esp+8));
+    break;
+  case SYS_CLOSE:
+    close(get_four_user_bytes(f->esp+4));
     break;
   case SYS_READ:
     f->eax = (uint32_t) read(get_four_user_bytes(f->esp+4),
