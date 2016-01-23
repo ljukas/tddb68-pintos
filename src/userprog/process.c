@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "lib/kernel/bitmap.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -104,7 +105,7 @@ process_exit (void)
   /* Free resources for all open files */
   int pos;
   for(pos = 2; pos < FD_SIZE; pos++) {     // Added lab 1
-    if(bitmap(cur->fd_map, pos)) {
+    if(bitmap_test(cur->fd_map, pos)) {
       bitmap_reset(cur->fd_map, pos);
       free(cur->file_list[pos]);
     }
