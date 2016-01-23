@@ -192,6 +192,10 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
 
+  #ifdef USERPROG
+  t->fd_map = bitmap_create(FD_SIZE); // Added lab 1
+  #endif
+  
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -277,9 +281,10 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
+  bitmap_destroy(thread_current()->fd_map); // Added lab 1
   process_exit ();
 #endif
-
+    
   /* Just set our status to dying and schedule another process.
      We will be destroyed during the call to schedule_tail(). */
   intr_disable ();
@@ -436,6 +441,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+
+  
+ 
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

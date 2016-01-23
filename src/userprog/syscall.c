@@ -5,6 +5,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/init.h"
+#include "lib/kernel/bitmap.h"
 
 static void syscall_handler (struct intr_frame *);
 static int get_four_user_bytes(const void * addr);
@@ -23,6 +24,30 @@ syscall_init (void)
 
 void halt(void) {
   power_off();
+}
+
+int open(const char* file) {
+  struct file *f;
+  
+  // Check that we are in uaddr and there are no segfaults
+  if(file >= PHYS_BASE || get_user(file) == -1) {
+    exit(-1);
+    NOT_REACHED();
+    return -1;
+  }
+
+  f = file_open(file);
+  if(!f) {
+    return -1;
+  }
+
+  //int fd = bitmap_scan_and_flip(thread_current()->fd_map, 2, 1, 0);
+  //if (fd == BITMAP_ERROR || STDIN_FILENO || STDOUT_FILENO) {
+  //  file_close(f);
+    //  return -1;
+    //}
+
+  return -1;
 }
 
 int write(int fd, const void *buffer, unsigned size) {
@@ -80,6 +105,9 @@ syscall_handler (struct intr_frame *f UNUSED)
   case SYS_EXIT:
     exit(-1);
     NOT_REACHED();
+  case SYS_OPEN:
+    f->eax = (uint32_t) open((const char*) get_four_user_bytes(f->esp+4));
+    break;
   case SYS_WRITE:
     f->eax = (uint32_t) write(get_four_user_bytes(f->esp+4),
 		   (const void*) get_four_user_bytes(f->esp+8),
