@@ -27,24 +27,41 @@ void halt(void) {
 }
 
 bool create(const char *file, unsigned initial_size) {
+  if(file + initial_size - 1 >= PHYS_BASE || get_user(file + initial_size - 1) == -1) {
+    exit(-1);
+    return -1;
+  }
+
   return filesys_create(file, initial_size);
 }
 
 int read(int fd, void *buffer, unsigned size) {
-  //unsigned i = 0;
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
-  if(fd >= BITMAPSIZE) return -1;
-  struct thread *cur = thread_current();
-  struct file *my_file = cur->file_list[fd];
+    exit(-1);
+    return -1;
+  }
+
+  int offset;
+   
+  if(fd >= BITMAPSIZE) {
+    return -1;
+  }
+  
   if(fd == STDIN_FILENO) {
-      for(unsigned i = 0; i < size; ++i) {
-	  buffer[i] = input_getc();
+      for(offset = 0; offset < size; ++offset) {
+	*(uint8_t *)(buffer + offset) = input_getc();
       }
       return size;
   }
-  int lenght = (int) file_read(my_file, buffer, size);
-  return lenght;
+  
+  struct thread *cur = thread_current();
+  struct file *my_file = cur->file_list[fd];
+
+  if(bitmap_test(cur->fd_map, fd)) { 
+    return (int) file_read(my_file, buffer, size);
   }
+  
+  return -1;
 }
 
 int open(const char* file) {
@@ -53,21 +70,24 @@ int open(const char* file) {
   // Check that we are in uaddr and there are no segfaults
   if(file >= PHYS_BASE || get_user(file) == -1) {
     exit(-1);
-    NOT_REACHED();
-    return -1;
-  }
-  f = file_open(file);
-  if(!f) {
     return -1;
   }
 
-  //int fd = bitmap_scan_and_flip(thread_current()->fd_map, 2, 1, 0);
-  //if (fd == BITMAP_ERROR || STDIN_FILENO || STDOUT_FILENO) {
-  //  file_close(f);
-    //  return -1;
-    //}
+  // Check if its OK to open one more file for the thread
+  int fd = bitmap_scan_and_flip(thread_current()->fd_map, 2, 1, 0);
+  if (fd == BITMAP_ERROR) {
+    return -1;
+  }
 
-  return -1;
+  // Open the file
+  f = filesys_open(file);
+  if(f == NULL) {
+    bitmap_reset(thread_current()->fd_map, fd);
+    return -1;
+  }
+
+  // Return file descriptor
+  return fd;
 }
 
 int write(int fd, const void *buffer, unsigned size) {
@@ -126,7 +146,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     exit(-1);
     NOT_REACHED();
   case SYS_CREATE:
-    f->eax = (uint32_t) create((const char *file) get_four_user_bytes(f->esp+4),
+    f->eax = (uint32_t) create((const char*) get_four_user_bytes(f->esp+4),
 			       (unsigned) get_four_user_bytes(f->esp+8));
     break;
   case SYS_READ:
