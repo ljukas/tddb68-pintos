@@ -12,6 +12,9 @@ static int get_four_user_bytes(const void * addr);
 static int get_user(const uint8_t *uaddr);
 static bool put_user(uint8_t *udst, uint8_t byte);
 void exit(int status);
+bool create(const char *file, unsigned initial_size);
+int read(int fd, void *buffer, unsigned size);
+int open(const char *file);
 
 void halt(void);
 
@@ -26,9 +29,16 @@ void halt(void) {
   power_off();
 }
 
+/* Exit thread */
+void exit(int status) {
+  // needs to be filled with more, status isn't handled atm for example
+  thread_exit();
+}
+
+
 /* Create a file */
 bool create(const char *file, unsigned initial_size) {
-  if(file + initial_size - 1 >= PHYS_BASE || get_user(file + initial_size - 1) == -1) {
+  if(file + initial_size - 1 >= PHYS_BASE || get_user((uint8_t*)(file + initial_size - 1)) == -1) {
     exit(-1);
     return -1;
   }
@@ -114,15 +124,18 @@ int write(int fd, const void *buffer, unsigned size) {
   // Check that we are in uaddr and there are no segfaults
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
     exit(-1);
-    NOT_REACHED();
-    return -1;
+    return retval;
   }
-  printf("step1");
+
+  if(fd >= FD_SIZE) {
+    return retval;
+  }
+
   // Make sure we dont try to write to a file with an index larger than the maximum allowed open programs
   if(fd >= FD_SIZE) {
      return -1;
   }
-  printf("step2");
+
   // Write to console
   if(fd == STDOUT_FILENO) {
     size_t offset = 0;
@@ -133,14 +146,15 @@ int write(int fd, const void *buffer, unsigned size) {
     putbuf((char*) (buffer + offset), (size_t) (size - offset));
     return size;
   }
-  printf("step3");
+
+
   struct thread *cur = thread_current(); 
   if(!bitmap_test(cur->fd_map, fd)) {
     return retval;
   }  
+
   struct file *my_file = cur->file_list[fd];
   retval = file_write(my_file, buffer, size);
-  printf("step4");
   return retval;
 }
 
@@ -149,13 +163,13 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
   int sys_call = get_four_user_bytes(f->esp);
-  //printf("Executing syscall: %d\n", sys_call);
   
   switch(sys_call) {  
   case SYS_HALT:
     halt();
     NOT_REACHED();
   case SYS_EXIT:
+    //TODO Return status and free allocated memory
     exit(-1);
     NOT_REACHED();
   case SYS_CREATE:
@@ -183,10 +197,6 @@ syscall_handler (struct intr_frame *f UNUSED)
     thread_exit();
     break;
   }
-}
-
-void exit(int status) {
-    thread_exit();
 }
 
 /* All system call arguments, weather integer or pointer
