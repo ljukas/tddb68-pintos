@@ -120,6 +120,7 @@ thread_start (void)
   sema_down (&idle_started);
 }
 
+/* added lab 2 */
 /* Puts a thread to sleep for a certain amount of ticks */
 void
 thread_sleep(int64_t sleep_until) {
@@ -133,6 +134,7 @@ thread_sleep(int64_t sleep_until) {
   
 }
 
+/* added lab 2 */
 /* Wakes threads that have been put to sleep if enough time has passed */
 void
 thread_wake(int64_t ticks) {
