@@ -126,8 +126,7 @@ void
 thread_sleep(int64_t sleep_until) {
   struct thread *t = thread_current ();
 
-  // Make sure no external interuppts are running
-  ASSERT(!intr_context());
+    ASSERT(!intr_context());
   
   t->sleep_until = sleep_until;
   list_push_back(&sleep_list, &t->sleep_elem);
@@ -146,12 +145,12 @@ thread_wake(int64_t ticks) {
   while(e != list_end(&sleep_list)) {
     struct thread *t = list_entry(e, struct thread, sleep_elem);
     ASSERT(is_thread(t));
-    e = list_next(e);
     if(t->sleep_until <= ticks) {
       t->sleep_until = 0;
       list_remove(&t->sleep_elem);
       thread_unblock(t);
     }
+    e = list_next(e);
   }
 }
 

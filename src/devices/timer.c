@@ -98,6 +98,7 @@ timer_sleep (int64_t ticks)
 {
   int64_t start = timer_ticks ();
 
+  /* changed lab 2 */
   enum intr_level old_level = intr_disable();
   thread_sleep(start + ticks);
   thread_block();

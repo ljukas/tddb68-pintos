@@ -96,8 +96,7 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    struct list_elem sleep_elem;        /* added lab 2 */
-    int64_t sleep_until;                /* Which tick to sleep until */ /* added lab 2 */ 
+    struct list_elem sleep_elem;        /* added lab 2 */ 
 
 #ifdef USERPROG
     struct file *file_list[FD_SIZE];   // Added lab 1
@@ -109,6 +108,7 @@ struct thread
 #endif
 
     /* Owned by thread.c. */
+    int64_t sleep_until;                /* Which tick to sleep until */ /* added lab 2 */
     unsigned magic;                     /* Detects stack overflow. */
   };
 
