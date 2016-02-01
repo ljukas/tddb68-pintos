@@ -281,8 +281,8 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
-  bitmap_destroy(thread_current()->fd_map); // Added lab 1
   process_exit ();
+  bitmap_destroy(thread_current()->fd_map); // Added lab 1
 #endif
     
   /* Just set our status to dying and schedule another process.

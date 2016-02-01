@@ -1,4 +1,4 @@
-#include "userprog/syscall.h"
+3#include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
@@ -11,12 +11,15 @@ static void syscall_handler (struct intr_frame *);
 static int get_four_user_bytes(const void * addr);
 static int get_user(const uint8_t *uaddr);
 static bool put_user(uint8_t *udst, uint8_t byte);
-void exit(int status);
-bool create(const char *file, unsigned initial_size);
-int read(int fd, void *buffer, unsigned size);
-int open(const char *file);
 
 void halt(void);
+void exit(int status);
+bool create(const char *file, unsigned initial_size);
+void close(int fd);
+int read(int fd, void *buffer, unsigned size);
+int open(const char *file);
+int write(int fd, const void *buffer, unsigned size);
+
 
 void
 syscall_init (void) 
@@ -38,6 +41,7 @@ void exit(int status) {
 
 /* Create a file */
 bool create(const char *file, unsigned initial_size) {
+  
   if(file + initial_size - 1 >= PHYS_BASE || get_user((uint8_t*)(file + initial_size - 1)) == -1) {
     exit(-1);
     return -1;
@@ -48,6 +52,7 @@ bool create(const char *file, unsigned initial_size) {
 
 /* Close a file if it is open */
 void close(int fd) {
+  
   struct thread *cur = thread_current();
   if(!bitmap_test(cur->fd_map, fd)) {
     struct file *my_file = cur->file_list[fd];
@@ -58,6 +63,7 @@ void close(int fd) {
 
 /* Read an open file */
 int read(int fd, void *buffer, unsigned size) {
+  
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
     exit(-1);
     return -1;
