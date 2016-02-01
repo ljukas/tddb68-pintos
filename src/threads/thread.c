@@ -24,6 +24,11 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* List of sleeping processes in THREAD_BLOCKED state, they
+   will be woken up after a certain amount of ticks*/
+static struct list sleep_list; /* added lab 2 */
+bool thread_structure_initiated = false;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -87,12 +92,15 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
+  list_init (&sleep_list); /* added lab 2 */
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
+  thread_structure_initiated = true; /* added lab 2 */
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -112,10 +120,44 @@ thread_start (void)
   sema_down (&idle_started);
 }
 
+/* Puts a thread to sleep for a certain amount of ticks */
+void
+thread_sleep(int64_t sleep_until) {
+  struct thread *t = thread_current ();
+
+  // Make sure no external interuppts are running
+  ASSERT(!intr_context());
+  
+  t->sleep_until = sleep_until;
+  list_push_back(&sleep_list, &t->sleep_elem);
+  
+}
+
+/* Wakes threads that have been put to sleep if enough time has passed */
+void
+thread_wake(int64_t ticks) {
+  struct list_elem *e;
+
+  ASSERT(intr_get_level() == INTR_OFF);
+
+  e = list_begin(&sleep_list);
+  while(e != list_end(&sleep_list)) {
+    struct thread *t = list_entry(e, struct thread, sleep_elem);
+    ASSERT(is_thread(t));
+    e = list_next(e);
+    if(t->sleep_until <= ticks) {
+      t->sleep_until = 0;
+      list_remove(&t->sleep_elem);
+      thread_unblock(t);
+    }
+  }
+}
+
+
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
-thread_tick (void) 
+thread_tick (int64_t ticks) 
 {
   struct thread *t = thread_current ();
 
@@ -128,6 +170,10 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
+
+  if(thread_structure_initiated) { /* added lab 2 */
+    thread_wake(ticks);
+  }
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)

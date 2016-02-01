@@ -96,6 +96,8 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    struct list_elem sleep_elem;        /* added lab 2 */
+    int64_t sleep_until;                /* Which tick to sleep until */ /* added lab 2 */ 
 
 #ifdef USERPROG
     struct file *file_list[FD_SIZE];   // Added lab 1
@@ -118,7 +120,9 @@ extern bool thread_mlfqs;
 void thread_init (void);
 void thread_start (void);
 
-void thread_tick (void);
+void thread_sleep(int64_t sleep_until);  /* added lab 2 */
+void thread_wake(int64_t ticks);   /* added lab 2 */
+void thread_tick (int64_t ticks);  /* inparam added lab 2 */
 void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
