@@ -126,7 +126,7 @@ void
 thread_sleep(int64_t sleep_until) {
   struct thread *t = thread_current ();
 
-    ASSERT(!intr_context());
+  ASSERT(!intr_context());
   
   t->sleep_until = sleep_until;
   list_push_back(&sleep_list, &t->sleep_elem);
