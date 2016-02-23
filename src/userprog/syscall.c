@@ -164,6 +164,17 @@ int write(int fd, const void *buffer, unsigned size) {
   return retval;
 }
 
+pid_t exec(const char *cmd_line) {
+
+  if(cmd_line >= PHYS_BASE || get_user(cmd_line) == -1) {
+    exit(-1);
+    return -1;
+  }
+  
+  // Returns child tid
+  return process_execute(cmd_line);
+}
+
 /* Handle all syscalls */
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
@@ -198,6 +209,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 			      (const void*) get_four_user_bytes(f->esp+8),
 			      (unsigned) get_four_user_bytes(f->esp+12));
     break;
+  case SYS_EXEC:
+    
   default:
     printf("Non-implemented syscall called for - crash successful \n");
     thread_exit();
