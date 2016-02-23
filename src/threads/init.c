@@ -82,7 +82,7 @@ main (void)
 
   /* Greet user. */
   /* Remember to change this #lol */
-  printf ("Pintos is preparing an unexpected jihad with %'zu kB RAM...\n", ram_pages * PGSIZE / 1024);
+  printf ("Pintos booting with %'zu kB RAM...\n", ram_pages * PGSIZE / 1024);
 
   /* Initialize memory system. */
   palloc_init ();
