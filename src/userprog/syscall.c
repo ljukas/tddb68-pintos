@@ -170,6 +170,7 @@ pid_t exec(const char *cmd_line) {
     exit(-1);
     return -1;
   }
+
   
   // Returns child tid
   return process_execute(cmd_line);
@@ -210,7 +211,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 			      (unsigned) get_four_user_bytes(f->esp+12));
     break;
   case SYS_EXEC:
-    
+    f->eax = (pid_t) exec((const char*)get_four_user_bytes(f->esp+4));
+    break;
   default:
     printf("Non-implemented syscall called for - crash successful \n");
     thread_exit();
