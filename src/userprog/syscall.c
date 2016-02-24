@@ -34,7 +34,13 @@ void halt(void) {
 
 /* Exit thread */
 void exit(int status) {
-  // needs to be filled with more, status isn't handled atm for example
+    printf("%s: exit(%d)\n", thread_current()->name, status);
+
+    // Update children
+    
+    
+    // Update parent
+    
   thread_exit();
 }
 
@@ -187,9 +193,8 @@ syscall_handler (struct intr_frame *f UNUSED)
     halt();
     NOT_REACHED();
   case SYS_EXIT:
-    //TODO Return status and free allocated memory
-    exit(-1);
-    NOT_REACHED();
+      exit((int) get_four_user_bytes(f->esp+4));
+      NOT_REACHED();
   case SYS_CREATE:
     f->eax = (uint32_t) create((const char*) get_four_user_bytes(f->esp+4),
 			       (unsigned) get_four_user_bytes(f->esp+8));

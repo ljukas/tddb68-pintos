@@ -484,6 +484,7 @@ is_thread (struct thread *t)
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
+    enum intr_level old_level;
   ASSERT (t != NULL);
   ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
   ASSERT (name != NULL);
@@ -496,9 +497,12 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   t->sleep_until = 0;
 #ifdef USERPROG
-  list_push_back(&thread_list, &t->threadelem);
+  list_init(&t->child_threads);
 #endif
-  
+
+  old_level = intr_disable();
+  list_push_back(&thread_list, &t->threadelem);
+  intr_set_level(old_level);
   
  
 }

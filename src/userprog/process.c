@@ -51,6 +51,22 @@ process_execute (const char *file_name)
   sema_down(&lock_sema);
   sema_up(&lock_sema);
 
+  struct thread *curr = thread_current();
+  struct child_thread *child = palloc_get_page(0);
+  // Check that child loaded successfully
+  struct thread child_t = get_thread_with_tid(tid);
+  if(!child_t->load_success) {
+      return -1;
+  }
+
+  // Set child-parent relation info
+  child->pid = tid;
+  child->exit_status = -1;
+  child->exited = false;
+  child->waiting = false;
+  list_push_back(&(curr->child_threads, &(child->elem)));
+  child_t->parent_pid = curr->tid;
+  
   
   
   if (tid == TID_ERROR)
@@ -77,7 +93,8 @@ start_process (void *file_name_)
 
   thread_current->load_success = success;
   sema_up(&lock_sema);
-  
+
+  palloc_free_page(0);
   
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -104,12 +121,47 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  // Infinity-loop, added in lab 1, needs to be removed later
-  while(1) {
-  }
-  return -1;
+    struct thread *curr = thread_current();
+    struct list_elem *e = list_begin(&(curr->child_threads));
+    struct child_thread *child;
+    bool is_child = false;
+    while(e != list_end(&(curr->child_threads))) {
+	struct *child_thread *child_t = list_entry(e, struct child_thread, elem);
+	if(child_t->pid == child_tid) {
+	    is_child = true;
+	    child = child_t;
+	    break;
+	}
+	e = list_next(e);
+    }
+
+    // If child_tid was wrong, exit
+    if(!is_child) {
+	return -1;
+    }
+
+    // Check if we are already waiting on child
+    // if not, we are now.
+    if(child->waiting) {
+	return -1;
+    } else {
+	child->waiting = true;
+    }
+
+    if(child_t->exited) {
+	list_remove(&(child->elem));
+	int exit_status = child->exit_status;
+	pallog_free_page(child);
+	return exit_status;
+    } else {
+	intr_disable();
+	thread_block();
+	intr_enable();
+    }
+    list_remove(&(child->elem));
+    return child->exit_status;
 }
 
 /* Free the current process's resources. */
@@ -118,7 +170,7 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
+  
   /* Free resources for all open files */
   int pos;
   for(pos = 2; pos < FD_SIZE; pos++) {     // Added lab 1
