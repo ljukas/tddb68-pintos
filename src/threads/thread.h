@@ -96,13 +96,17 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    struct list_elem sleep_elem;        /* added lab 2 */ 
+      struct list_elem sleep_elem;        /* added lab 2 */
+      struct list_elem thread_elem;
 
 #ifdef USERPROG
     struct file *file_list[FD_SIZE];   // Added lab 1
 
     /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
+      uint32_t *pagedir;                  /* Page directory. */
+      int load_success;
+      tid_t parent_pid;
+      struct list child_threads;
     /* File desriptors */
     struct bitmap * fd_map;             // Added lab 1
 #endif
@@ -145,5 +149,7 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+struct thread *get_thread_with_tid(tid_t tid);
 
 #endif /* threads/thread.h */

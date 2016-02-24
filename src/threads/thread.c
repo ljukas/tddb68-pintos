@@ -29,6 +29,10 @@ static struct list ready_list;
 static struct list sleep_list; /* added lab 2 */
 bool thread_structure_initiated = false;
 
+/* List of all threads/processes, proceses will be added
+   here when they are created and removed when they exit */
+static struct list thread_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -93,6 +97,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&sleep_list); /* added lab 2 */
+  list_init (&thread_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -335,6 +340,7 @@ thread_exit (void)
   /* Just set our status to dying and schedule another process.
      We will be destroyed during the call to schedule_tail(). */
   intr_disable ();
+  list_remove(&thread_current()->thread_elem);
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
@@ -488,7 +494,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-
+  t->sleep_until = 0;
+#ifdef USERPROG
+  list_push_back(&thread_list, &t->threadelem);
+#endif
+  
   
  
 }
@@ -602,7 +612,25 @@ allocate_tid (void)
 
   return tid;
 }
-
+
+/* Returns the thread with the given tid */
+struct thread *get_thread_with_tid(tid_t tid) {
+    struct list_elem *e;
+
+    for(e = list_begin(&thread_list);
+	e != list_end(&thread_list);
+	e = list_next(e)) {
+	struct thread *t = list_entry(e, struct thread, thread_elem);
+	if(t->tid == tid) {
+	    return t;
+	}
+    }
+
+    return NULL;
+}
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+
