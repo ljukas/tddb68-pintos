@@ -120,7 +120,7 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     int load_success;
     tid_t parent_pid;
-    struct semaphore load_sema;     /* Lab 3 - for the parent */
+    struct semaphore * load_sema;     /* Lab 3 - for the parent */
     struct list child_threads;
     /* File desriptors */
     struct bitmap * fd_map;             // Added lab 1

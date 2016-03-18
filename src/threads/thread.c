@@ -92,6 +92,8 @@ static tid_t allocate_tid (void);
 void
 thread_init (void) 
 {
+  printf("thread_init\n");
+
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
@@ -106,6 +108,7 @@ thread_init (void)
   initial_thread->tid = allocate_tid ();
 
   thread_structure_initiated = true; /* added lab 2 */
+  printf("thread_init DONE\n");
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -113,6 +116,8 @@ thread_init (void)
 void
 thread_start (void) 
 {
+
+  printf("thread_start\n");
   /* Create the idle thread. */
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
@@ -123,19 +128,21 @@ thread_start (void)
 
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
+  printf("thread_start DONE\n");
 }
 
 /* added lab 2 */
 /* Puts a thread to sleep for a certain amount of ticks */
 void
 thread_sleep(int64_t sleep_until) {
-  struct thread *t = thread_current ();
 
+  printf("thread_sleep\n");
+  struct thread *t = thread_current ();
+  
   ASSERT(!intr_context());
   
   t->sleep_until = sleep_until;
   list_push_back(&sleep_list, &t->sleep_elem);
-  
 }
 
 /* added lab 2 */
@@ -213,7 +220,9 @@ tid_t
 thread_create (const char *name, int priority,
                thread_func *function, void *aux) 
 {
-    // PENIS gör en struct för aux där den tar in tex 2 args
+  printf("thread_create \n");
+
+    // gör en struct för aux där den tar in tex 2 args
     //
   struct thread *t;
   struct kernel_thread_frame *kf;
@@ -486,6 +495,7 @@ is_thread (struct thread *t)
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
+  printf("init_thread\n");
     enum intr_level old_level;
   ASSERT (t != NULL);
   ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);

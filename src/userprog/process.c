@@ -45,21 +45,28 @@ process_execute (const char *cmd_line)
   /* Makes another copy to get the filename without messing with the original copy */
   tmp_fn = palloc_get_page(0);
   if (tmp_fn == NULL)
+    palloc_free_page(tmp_fn);
     return TID_ERROR;
   strlcpy (tmp_fn, cmd_line, PGSIZE);
 
   // ta ut file name
   char *file_name = strtok_r(tmp_fn, " ", &tmp_fn);
 
+
   struct thread *curr = thread_current();
   // Added lab 3
-  sema_init(&(curr->load_sema), 0);
-  
+  sema_init(curr->load_sema, 0);
+
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+ 
 
-  sema_down(&(curr->load_sema));
-
+  if (tid != TID_ERROR) {
+    sema_down (curr->load_sema);
+  } else {
+    palloc_free_page (fn_copy);
+  }
+     
   // Check that child loaded successfully
   
   struct thread *child_t = get_thread_with_tid(tid);
@@ -70,6 +77,8 @@ process_execute (const char *cmd_line)
   // succeeded, so we dont allocate memory unnessarily
   struct child_status *child = palloc_get_page(0);
 
+  palloc_free_page (tmp_fn);
+
   // Set child-parent relation info
   list_push_back(&(curr->child_threads), &(child->elem));
   child->exit_status = -1;
@@ -78,10 +87,6 @@ process_execute (const char *cmd_line)
   child->pid = tid;
   child_t->parent_pid = curr->tid;
   
-  palloc_free_page (tmp_fn);
-
-  if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
   return tid;
 }
 
@@ -94,6 +99,8 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+  printf("start_process\n");
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -105,7 +112,7 @@ start_process (void *file_name_)
 
   thread_current()->load_success = success;
   struct thread *parent = get_thread_with_tid(thread_current()->parent_pid);
-  sema_up(&(parent->load_sema));;
+  sema_up(parent->load_sema);
 
     /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -134,6 +141,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid) 
 {
+  printf("process_wait\n");
     struct thread *curr = thread_current();
     struct list_elem *e;
     struct child_status *child_s;
@@ -299,6 +307,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
+
+  printf("load \n");
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -312,12 +322,67 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+/* Set up stack. */
+  if (!setup_stack (esp)){
+    goto done;
+  }
 
+  /* Fill the stack with cookies or arguments */
+  char *argv[32];
+  int argc = 0;
+  char *token, *save_ptr;
+  char *fn_copy;
+
+  fn_copy = palloc_get_page(0);
+  if(fn_copy == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy, file_name, PGSIZE);
+
+  file_name = strtok_r(file_name, " ", &save_ptr);
+
+  for(token = strtok_r(fn_copy, " ", &save_ptr);
+      token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+    {
+      *esp -= strlen(token) + 1;
+      memcpy(*esp, token, strlen(token) + 1);
+      argv[argc++] = (char *) *esp;
+      if (argc == 31)
+	break;
+    }
+  argv[argc] = 0;
+
+  // Align to 4 bytes so that the processor works att full speed
+  uint8_t word_align = (size_t) *esp % 4;
+  if(word_align){
+    *esp -= word_align;
+    memcpy(*esp, &argv[argc], word_align);
+  }
+
+  // Push the pointers to the args
+  for(i = argc; i >= 0; i--) {
+    *esp -= sizeof(argv[i]);
+    memcpy(*esp, &argv[i], sizeof(argv[i]));
+  }
+
+  // Push argv
+  void* tmp = *esp;
+  *esp -= sizeof(&tmp);
+  memcpy(*esp, &tmp, sizeof(&tmp));
+
+  // Push argc
+  *esp -= sizeof(argc);
+  memcpy(*esp, &argc, sizeof(argc));
+
+  // Push fake return address
+  *esp -= sizeof(argv[argc]); // 0
+  memcpy(*esp, &argv[argc], sizeof(argv[argc]));
+  
+  // OUR WORK IS DONE; STACK IS FINISHED
 
    /* Uncomment the following line to print some debug
      information. This will be useful when you debug the program
      stack.*/
-  /*#define STACK_DEBUG*/
+#define STACK_DEBUG
 
 #ifdef STACK_DEBUG
   printf("*esp is %p\nstack contents:\n", *esp);
@@ -432,71 +497,19 @@ load (const char *file_name, void (**eip) (void), void **esp)
         }
     }
 
-  /* Set up stack. */
-  if (!setup_stack (esp)){
-    goto done;
-  }
-
-  /* Fill the stack with cookies or arguments */
-  char *argv[32];
-  int argc = 0;
-  char *token, *save_ptr;
-  char *fn_copy;
-
-  fn_copy = palloc_get_page(0);
-  if(fn_copy == NULL)
-    return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
-
-  file_name = strtok_r(file_name, " ", &save_ptr);
-
-  for(token = strtok_r(fn_copy, " ", &save_ptr);
-      token != NULL; token = strtok_r(NULL, " ", &save_ptr))
-    {
-      *esp -= strlen(token) + 1;
-      memcpy(*esp, token, strlen(token) + 1);
-      argv[argc++] = (char *) *esp;
-      if (argc == 31)
-	break;
-    }
-  argv[argc] = 0;
-
-  // Align to 4 bytes so that the processor works att full speed
-  uint8_t word_align = (size_t) *esp % 4;
-  if(word_align){
-    *esp -= word_align;
-    memcpy(*esp, &argv[argc], word_align);
-  }
-
-  // Push the pointers to the args
-  for(i = argc; i >= 0; i--) {
-    *esp -= sizeof(argv[i]);
-    memcpy(*esp, &argv[i], sizeof(argv[i]));
-  }
-
-  // Push argv
-  void* tmp = *esp;
-  *esp -= sizeof(&tmp);
-  memcpy(*esp, &tmp, sizeof(&tmp));
-
-  // Push argc
-  *esp -= sizeof(argc);
-  memcpy(*esp, &argc, sizeof(argc));
-
-  // Push fake return address
-  *esp -= sizeof(argv[argc]); // 0
-  memcpy(*esp, &argv[argc], sizeof(argv[argc]));
   
-  // OUR WORK IS DONE; STACK IS FINISHED
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
 
+
+
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+  printf("load: DONE\n");
   return success;
 }
 
