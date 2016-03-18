@@ -42,9 +42,6 @@ process_execute (const char *cmd_line)
     return TID_ERROR;
   strlcpy (fn_copy, cmd_line, PGSIZE);
 
-  /* PARSE THE FUCK OUT OF SHIT */
-  char *file_name;
-
   /* Makes another copy to get the filename without messing with the original copy */
   tmp_fn = palloc_get_page(0);
   if (tmp_fn == NULL)
@@ -54,16 +51,15 @@ process_execute (const char *cmd_line)
   // ta ut file name
   char *file_name = strtok_r(tmp_fn, " ", &tmp_fn);
 
-
+  struct thread *curr = thread_current();
   // Added lab 3
-  sema_init(&(thread_current->load_sema), 0);
+  sema_init(&(curr->load_sema), 0);
   
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
 
-  sema_down(&(thread_current->load_sema));
+  sema_down(&(curr->load_sema));
 
-  struct thread *curr = thread_current();
   // Check that child loaded successfully
   
   struct thread *child_t = get_thread_with_tid(tid);

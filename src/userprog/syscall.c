@@ -223,24 +223,7 @@ pid_t exec(const char *cmd_line) {
     exit(-1);
     return -1;
   }
-
-
-  // Pass arguements to stack
-  char *cmd_line_arguments[];
-  int i = 0;
-  char *token, *save_ptr;
-  
-  for(token = strtok_r (cmd_line, " ", &save_ptr); token != NULL;
-      token = strtok_r (NULL, " ", &save_ptr)) {
-      cmd_line_arguments[i] = token;
-      i++;
-  }
-
-  f->esp+4 = cmd_line_arguments[1];
-  f->esp+8 = cmd_line_arguments[2];
-  f->esp+12 = NULL;
-  
-  
+ 
   
   // Returns child tid
   return process_execute(cmd_line);;

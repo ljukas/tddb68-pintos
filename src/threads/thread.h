@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "lib/kernel/bitmap.h"
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -118,8 +119,8 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
     int load_success;
-      tid_t parent_pid;
-      struct semaphore load_sema;     /* Lab 3 - for the parent */
+    tid_t parent_pid;
+    struct semaphore load_sema;     /* Lab 3 - for the parent */
     struct list child_threads;
     /* File desriptors */
     struct bitmap * fd_map;             // Added lab 1
