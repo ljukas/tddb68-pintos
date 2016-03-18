@@ -32,7 +32,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *cmd_line) 
 {
-  char *fn_copy;
+  char *fn_copy, *tmp_fn;
   tid_t tid;
 
   /* Make a copy of CMD_LINE.
@@ -44,7 +44,16 @@ process_execute (const char *cmd_line)
 
   /* PARSE THE FUCK OUT OF SHIT */
   char *file_name;
-  
+
+  /* Makes another copy to get the filename without messing with the original copy */
+  tmp_fn = palloc_get_page(0);
+  if (tmp_fn == NULL)
+    return TID_ERROR;
+  strlcpy (tmp_fn, cmd_line, PGSIZE);
+
+  // ta ut file name
+  char *file_name = strtok_r(tmp_fn, " ", &tmp_fn);
+
 
   // Added lab 3
   sema_init(&(thread_current->load_sema), 0);
@@ -73,7 +82,8 @@ process_execute (const char *cmd_line)
   child->pid = tid;
   child_t->parent_pid = curr->tid;
   
- 
+  palloc_free_page (tmp_fn);
+
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -306,10 +316,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-  /* Set up stack. */
-  if (!setup_stack (esp)){
-    goto done;
-  }
+
 
    /* Uncomment the following line to print some debug
      information. This will be useful when you debug the program
@@ -428,6 +435,63 @@ load (const char *file_name, void (**eip) (void), void **esp)
           break;
         }
     }
+
+  /* Set up stack. */
+  if (!setup_stack (esp)){
+    goto done;
+  }
+
+  /* Fill the stack with cookies or arguments */
+  char *argv[32];
+  int argc = 0;
+  char *token, *save_ptr;
+  char *fn_copy;
+
+  fn_copy = palloc_get_page(0);
+  if(fn_copy == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy, file_name, PGSIZE);
+
+  file_name = strtok_r(file_name, " ", &save_ptr);
+
+  for(token = strtok_r(fn_copy, " ", &save_ptr);
+      token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+    {
+      *esp -= strlen(token) + 1;
+      memcpy(*esp, token, strlen(token) + 1);
+      argv[argc++] = (char *) *esp;
+      if (argc == 31)
+	break;
+    }
+  argv[argc] = 0;
+
+  // Align to 4 bytes so that the processor works att full speed
+  uint8_t word_align = (size_t) *esp % 4;
+  if(word_align){
+    *esp -= word_align;
+    memcpy(*esp, &argv[argc], word_align);
+  }
+
+  // Push the pointers to the args
+  for(i = argc; i >= 0; i--) {
+    *esp -= sizeof(argv[i]);
+    memcpy(*esp, &argv[i], sizeof(argv[i]));
+  }
+
+  // Push argv
+  void* tmp = *esp;
+  *esp -= sizeof(&tmp);
+  memcpy(*esp, &tmp, sizeof(&tmp));
+
+  // Push argc
+  *esp -= sizeof(argc);
+  memcpy(*esp, &argc, sizeof(argc));
+
+  // Push fake return address
+  *esp -= sizeof(argv[argc]); // 0
+  memcpy(*esp, &argv[argc], sizeof(argv[argc]));
+  
+  // OUR WORK IS DONE; STACK IS FINISHED
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
@@ -562,12 +626,12 @@ setup_stack (void **esp)
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
 	// Changed in lab 1, needs to changed back later
-        *esp = PHYS_BASE - 12;
+        *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }
   return success;
-}
+} 
 
 /* Adds a mapping from user virtual address UPAGE to kernel
    virtual address KPAGE to the page table.
