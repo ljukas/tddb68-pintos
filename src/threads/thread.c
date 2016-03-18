@@ -97,7 +97,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&sleep_list); /* added lab 2 */
-  list_init (&thread_list);
+  list_init (&thread_list); /* added lab 3 */
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -213,6 +213,8 @@ tid_t
 thread_create (const char *name, int priority,
                thread_func *function, void *aux) 
 {
+    // PENIS gör en struct för aux där den tar in tex 2 args
+    //
   struct thread *t;
   struct kernel_thread_frame *kf;
   struct switch_entry_frame *ef;
@@ -340,7 +342,7 @@ thread_exit (void)
   /* Just set our status to dying and schedule another process.
      We will be destroyed during the call to schedule_tail(). */
   intr_disable ();
-  list_remove(&thread_current()->thread_elem);
+  list_remove(&(thread_current()->thread_elem));
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
@@ -499,9 +501,9 @@ init_thread (struct thread *t, const char *name, int priority)
 #ifdef USERPROG
   list_init(&t->child_threads);
 #endif
-
+  
   old_level = intr_disable();
-  list_push_back(&thread_list, &t->threadelem);
+  list_push_back(&thread_list, &t->thread_elem);
   intr_set_level(old_level);
   
  

@@ -1,10 +1,13 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
+#include "user/syscall.h"
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/init.h"
+#include "threads/synch.h"
+#include "userprog/process.h"
 #include "lib/kernel/bitmap.h"
 
 static void syscall_handler (struct intr_frame *);
@@ -19,6 +22,8 @@ void close(int fd);
 int read(int fd, void *buffer, unsigned size);
 int open(const char *file);
 int write(int fd, const void *buffer, unsigned size);
+pid_t exec(const char*);
+int wait(pid_t);
 
 
 void
@@ -36,10 +41,52 @@ void halt(void) {
 void exit(int status) {
     printf("%s: exit(%d)\n", thread_current()->name, status);
 
+    struct thread *cur = thread_current();
+    struct list_elem *e;
+    
     // Update children
+    // Tell the chilren that we've exited
+    // That is they don't have a parent anymore
+    for(e = list_begin(&(cur->child_threads));
+	e != list_end(&(cur->child_threads));
+	e = list_next(e)) {
+	struct child_status *child_s = list_entry(e, struct child_status, elem);
+
+	if(!child_s->exited) {
+	    struct thread *child_t = get_thread_with_tid(child_s->pid);
+	    child_t->parent_pid = 1;
+	}
+	list_remove(&(child_s->elem));
+	palloc_free_page(child_s);
+    }
     
     
     // Update parent
+    // Tell the parent that we've exited
+    struct thread *parent_thread = get_thread_with_tid(cur->parent_pid);
+    for(e = list_begin(&(parent_thread->child_threads));
+	e != list_end(&(parent_thread->child_threads));
+	e = list_next(e)) {
+	struct child_status *child_s = list_entry(e, struct child_status, elem);
+
+	if(child_s->pid == cur->tid) {
+	    child_s->exited = true;
+	    child_s->exit_status = status;
+	    if(child_s->waiting) {
+		thread_unblock(parent_thread);
+	    }
+	}
+    }
+    
+     /* Free resources for all open files */
+    int pos;
+    for(pos = 2; pos < FD_SIZE; pos++) {     // Added lab 1
+	if(bitmap_test(cur->fd_map, pos)) {
+	    bitmap_reset(cur->fd_map, pos);
+	    free(cur->file_list[pos]);
+	}
+    }
+    
     
   thread_exit();
 }
@@ -177,14 +224,35 @@ pid_t exec(const char *cmd_line) {
     return -1;
   }
 
+
+  // Pass arguements to stack
+  char *cmd_line_arguments[];
+  int i = 0;
+  char *token, *save_ptr;
+  
+  for(token = strtok_r (cmd_line, " ", &save_ptr); token != NULL;
+      token = strtok_r (NULL, " ", &save_ptr)) {
+      cmd_line_arguments[i] = token;
+      i++;
+  }
+
+  f->esp+4 = cmd_line_arguments[1];
+  f->esp+8 = cmd_line_arguments[2];
+  f->esp+12 = NULL;
+  
+  
   
   // Returns child tid
-  return process_execute(cmd_line);
+  return process_execute(cmd_line);;
+}
+
+int wait(pid_t pid) {
+    return process_wait(pid);
 }
 
 /* Handle all syscalls */
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f) 
 {
   int sys_call = get_four_user_bytes(f->esp);
   
@@ -218,6 +286,9 @@ syscall_handler (struct intr_frame *f UNUSED)
   case SYS_EXEC:
     f->eax = (pid_t) exec((const char*)get_four_user_bytes(f->esp+4));
     break;
+  case SYS_WAIT:
+      f->eax = (int) wait((pid_t) get_four_user_bytes(f->esp+4));
+      break;
   default:
     printf("Non-implemented syscall called for - crash successful \n");
     thread_exit();

@@ -17,58 +17,63 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
 #include "lib/kernel/bitmap.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
-static struct semaphore lock_sema;
+
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t
-process_execute (const char *file_name) 
+process_execute (const char *cmd_line) 
 {
   char *fn_copy;
   tid_t tid;
 
-  /* Make a copy of FILE_NAME.
+  /* Make a copy of CMD_LINE.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (fn_copy, cmd_line, PGSIZE);
+
+  /* PARSE THE FUCK OUT OF SHIT */
+  char *file_name;
+  
 
   // Added lab 3
-  sema_init(&lock_sema, 1);
-  sema_down(&lock_sema);
+  sema_init(&(thread_current->load_sema), 0);
   
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
 
-  sema_down(&lock_sema);
-  sema_up(&lock_sema);
+  sema_down(&(thread_current->load_sema));
 
   struct thread *curr = thread_current();
-  struct child_thread *child = palloc_get_page(0);
   // Check that child loaded successfully
-  struct thread child_t = get_thread_with_tid(tid);
+  
+  struct thread *child_t = get_thread_with_tid(tid);
   if(!child_t->load_success) {
       return -1;
   }
+  // init child_status after we've checked that load
+  // succeeded, so we dont allocate memory unnessarily
+  struct child_status *child = palloc_get_page(0);
 
   // Set child-parent relation info
-  child->pid = tid;
+  list_push_back(&(curr->child_threads), &(child->elem));
   child->exit_status = -1;
   child->exited = false;
   child->waiting = false;
-  list_push_back(&(curr->child_threads, &(child->elem)));
+  child->pid = tid;
   child_t->parent_pid = curr->tid;
   
-  
-  
+ 
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -90,13 +95,13 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-
-  thread_current->load_success = success;
-  sema_up(&lock_sema);
-
-  palloc_free_page(0);
   
-  /* If load failed, quit. */
+
+  thread_current()->load_success = success;
+  struct thread *parent = get_thread_with_tid(thread_current()->parent_pid);
+  sema_up(&(parent->load_sema));;
+
+    /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
     thread_exit ();
@@ -124,19 +129,21 @@ int
 process_wait (tid_t child_tid) 
 {
     struct thread *curr = thread_current();
-    struct list_elem *e = list_begin(&(curr->child_threads));
-    struct child_thread *child;
+    struct list_elem *e;
+    struct child_status *child_s;
     bool is_child = false;
-    while(e != list_end(&(curr->child_threads))) {
-	struct *child_thread *child_t = list_entry(e, struct child_thread, elem);
-	if(child_t->pid == child_tid) {
+    // Check if the given child_tid is a child to current thread.
+    for(e = list_begin(&(curr->child_threads));
+	e != list_end(&(curr->child_threads));
+	e = list_next(e)) {
+	struct child_status *temp = list_entry(e, struct child_status, elem);
+	if(temp->pid == child_tid) {
 	    is_child = true;
-	    child = child_t;
+	    child_s = temp;
 	    break;
 	}
-	e = list_next(e);
     }
-
+		      
     // If child_tid was wrong, exit
     if(!is_child) {
 	return -1;
@@ -144,24 +151,28 @@ process_wait (tid_t child_tid)
 
     // Check if we are already waiting on child
     // if not, we are now.
-    if(child->waiting) {
+    if(child_s->waiting) {
 	return -1;
-    } else {
-	child->waiting = true;
     }
+    child_s->waiting = true;
 
-    if(child_t->exited) {
-	list_remove(&(child->elem));
-	int exit_status = child->exit_status;
-	pallog_free_page(child);
+    // Check if child has exited, if so get it's exit_status and return
+    if(child_s->exited) {
+	int exit_status = child_s->exit_status;
+	list_remove(&(child_s->elem));
+	palloc_free_page(child_s);
 	return exit_status;
     } else {
+	// block thread since we want to wait until child has exited before
 	intr_disable();
 	thread_block();
 	intr_enable();
     }
-    list_remove(&(child->elem));
-    return child->exit_status;
+    // Remove child from list of childs.
+    int exit_status = child_s->exit_status;
+    list_remove(&(child_s->elem));
+    palloc_free_page(child_s);
+    return exit_status;
 }
 
 /* Free the current process's resources. */
@@ -171,15 +182,7 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
   
-  /* Free resources for all open files */
-  int pos;
-  for(pos = 2; pos < FD_SIZE; pos++) {     // Added lab 1
-    if(bitmap_test(cur->fd_map, pos)) {
-      bitmap_reset(cur->fd_map, pos);
-      free(cur->file_list[pos]);
-    }
-  }
-  
+ 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -311,7 +314,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
    /* Uncomment the following line to print some debug
      information. This will be useful when you debug the program
      stack.*/
-/*#define STACK_DEBUG*/
+  /*#define STACK_DEBUG*/
 
 #ifdef STACK_DEBUG
   printf("*esp is %p\nstack contents:\n", *esp);

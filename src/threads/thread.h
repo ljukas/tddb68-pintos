@@ -86,13 +86,17 @@ typedef int tid_t;
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
 
-struct child_thread {
-    tid_t pid;
+struct child_status {
+    struct list_elem elem;
     int exit_status;
     bool exited;
     bool waiting;
-    struct list_elem elem;
+    tid_t pid;
 };
+
+
+
+// fix semaphore in process execute
 
 struct thread
   {
@@ -105,17 +109,18 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-      struct list_elem sleep_elem;        /* added lab 2 */
-      struct list_elem thread_elem;
+    struct list_elem sleep_elem;        /* added lab 2 */
+    struct list_elem thread_elem;
 
 #ifdef USERPROG
     struct file *file_list[FD_SIZE];   // Added lab 1
 
     /* Owned by userprog/process.c. */
-      uint32_t *pagedir;                  /* Page directory. */
-      int load_success;
+    uint32_t *pagedir;                  /* Page directory. */
+    int load_success;
       tid_t parent_pid;
-      struct list child_threads;
+      struct semaphore load_sema;     /* Lab 3 - for the parent */
+    struct list child_threads;
     /* File desriptors */
     struct bitmap * fd_map;             // Added lab 1
 #endif
