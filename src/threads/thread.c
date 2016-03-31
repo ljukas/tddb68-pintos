@@ -92,7 +92,7 @@ static tid_t allocate_tid (void);
 void
 thread_init (void) 
 {
-  printf("thread_init\n");
+  printf("t: thread_init\n");
 
   ASSERT (intr_get_level () == INTR_OFF);
 
@@ -101,6 +101,8 @@ thread_init (void)
   list_init (&sleep_list); /* added lab 2 */
   list_init (&thread_list); /* added lab 3 */
 
+  
+
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -108,7 +110,6 @@ thread_init (void)
   initial_thread->tid = allocate_tid ();
 
   thread_structure_initiated = true; /* added lab 2 */
-  printf("thread_init DONE\n");
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -116,8 +117,7 @@ thread_init (void)
 void
 thread_start (void) 
 {
-
-  printf("thread_start\n");
+  printf("t: thread_start\n");
   /* Create the idle thread. */
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
@@ -128,7 +128,6 @@ thread_start (void)
 
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
-  printf("thread_start DONE\n");
 }
 
 /* added lab 2 */
@@ -136,7 +135,7 @@ thread_start (void)
 void
 thread_sleep(int64_t sleep_until) {
 
-  printf("thread_sleep\n");
+  printf("t: thread_sleep\n");
   struct thread *t = thread_current ();
   
   ASSERT(!intr_context());
@@ -220,7 +219,7 @@ tid_t
 thread_create (const char *name, int priority,
                thread_func *function, void *aux) 
 {
-  printf("thread_create \n");
+  //printf("thread_create \n");
 
     // gör en struct för aux där den tar in tex 2 args
     //
@@ -255,8 +254,28 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
 
+
   #ifdef USERPROG
   t->fd_map = bitmap_create(FD_SIZE); // Added lab 1
+
+  // init child_status after we've checked that load
+  // succeeded, so we dont allocate memory unnessarily
+  struct child_status *child_s = palloc_get_page(0);
+
+  //palloc_free_page (tmp_fn);
+
+  // Set child-parent relation info
+  child_s->exit_status = -1;
+  child_s->exited = false;
+  child_s->waiting = false;
+  child_s->pid = tid;
+
+  sema_init(&t->load_sema, 0);
+ 
+  struct thread *parent = thread_current();
+  //need to lock
+  list_push_back(&parent->child_threads, &child_s->elem);
+  //need to unlock
   #endif
   
   /* Add to run queue. */
@@ -495,7 +514,7 @@ is_thread (struct thread *t)
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
-  printf("init_thread\n");
+  //printf("init_thread\n");
     enum intr_level old_level;
   ASSERT (t != NULL);
   ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);

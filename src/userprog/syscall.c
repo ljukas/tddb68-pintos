@@ -29,13 +29,13 @@ int wait(pid_t);
 void
 syscall_init (void) 
 {
-  printf("syscall_init\n");
+  printf("s: syscall_init\n");
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 /* Halts pintos */
 void halt(void) {
-  printf("\n halt \n");
+  printf("s: halt \n");
   power_off();
 }
 
@@ -96,7 +96,7 @@ void exit(int status) {
 
 /* Create a file */
 bool create(const char *file, unsigned initial_size) {
-  printf("create \n");
+  printf("s: create \n");
   if(file + initial_size - 1 >= PHYS_BASE || get_user((uint8_t*)(file + initial_size - 1)) == -1) {
     exit(-1);
     return -1;
@@ -107,7 +107,7 @@ bool create(const char *file, unsigned initial_size) {
 
 /* Close a file if it is open */
 void close(int fd) {
-  printf("close \n");
+  printf("s: close \n");
   struct thread *cur = thread_current();
   if(!bitmap_test(cur->fd_map, fd)) {
     struct file *my_file = cur->file_list[fd];
@@ -118,7 +118,7 @@ void close(int fd) {
 
 /* Read an open file */
 int read(int fd, void *buffer, unsigned size) {
-  printf("read \n");
+  printf("s: read \n");
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
     exit(-1);
     return -1;
@@ -150,7 +150,7 @@ int read(int fd, void *buffer, unsigned size) {
 /* Open a created file */
 int open(const char* file) {
   struct file *f;
-  printf("open \n");
+  printf("s: open \n");
   // Check that we are in uaddr and there are no segfaults
   if(file >= PHYS_BASE || get_user(file) == -1) {
     exit(-1);
@@ -181,7 +181,7 @@ int open(const char* file) {
 /* Write in an open file */
 int write(int fd, const void *buffer, unsigned size) {
   int retval = -1;
-  printf(" create \n");
+  printf("s: write \n");
   // Check that we are in uaddr and there are no segfaults
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
     exit(-1);
@@ -220,7 +220,7 @@ int write(int fd, const void *buffer, unsigned size) {
 }
 
 pid_t exec(const char *cmd_line) {
-  printf("exec \n");
+  printf("s: exec \n");
   if(cmd_line >= PHYS_BASE || get_user(cmd_line) == -1) {
     exit(-1);
     return -1;
@@ -232,7 +232,7 @@ pid_t exec(const char *cmd_line) {
 }
 
 int wait(pid_t pid) {
-  printf("wait \n");
+  printf("s: wait \n");
 
     return process_wait(pid);
 }
