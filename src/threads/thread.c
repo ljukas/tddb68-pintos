@@ -514,7 +514,7 @@ is_thread (struct thread *t)
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
-  //printf("init_thread\n");
+  printf("t: init_thread\n");
     enum intr_level old_level;
   ASSERT (t != NULL);
   ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);

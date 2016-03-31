@@ -112,6 +112,7 @@ struct thread
     struct list_elem elem;              /* List element. */
     struct list_elem sleep_elem;        /* added lab 2 */
     struct list_elem thread_elem;
+    
 
 #ifdef USERPROG
     struct file *file_list[FD_SIZE];   // Added lab 1

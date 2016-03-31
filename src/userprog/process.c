@@ -32,7 +32,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *cmd_line) 
 {
-  //printf("process_execute\n");
+  printf("process_execute\n");
   char *fn_copy, *tmp_fn;
   tid_t tid;
 
@@ -43,33 +43,29 @@ process_execute (const char *cmd_line)
     return TID_ERROR;
   strlcpy (fn_copy, cmd_line, PGSIZE);
 
-  //printf("process: l: 45\n");
+  printf("p: l: 45\n");
   
   /* Makes another copy to get the filename without messing with the original copy */
 
   tmp_fn = palloc_get_page(0);
   if (tmp_fn == NULL) {
-    //palloc_free_page(tmp_fn);
-    printf("process: l: 51\n");
+    printf("p: l: 51\n");
     return TID_ERROR;
   }
   strlcpy (tmp_fn, cmd_line, PGSIZE);
 
-  //printf("process: l: 54\n");
+  printf("p: l: 54\n");
   // ta ut file name
   char *file_name = strtok_r(tmp_fn, " ", &tmp_fn);
 
 
   struct thread *curr = thread_current();
   // Added lab 3
-  //printf("p: l: 65\n");
-  //sema_init(curr->load_sema, 0); //worthless
-  //printf("p: l: 67\n");
-
+  
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
  
-  //printf("process: l: 70\n");
+  printf("p: l: 70\n");
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
   }
@@ -93,13 +89,12 @@ process_execute (const char *cmd_line)
 static void
 start_process (void *file_name_)
 {
-  //printf("start_process\n");
+  printf("p: start_process\n");
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
 
-  //printf("start_process\n");
-
+  
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -107,14 +102,14 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  //printf("p: l: 123 \n");
+  printf("p: l: 105 \n");
 
   thread_current()->load_success = success;
-  //struct thread *parent = get_thread_with_tid(thread_current()->parent_pid);
-  //printf("p: l: 127\n");
+  
+  printf("p: l: 109\n");
   sema_up(&thread_current()->load_sema);
+  printf("p: l: 111\n");
 
-  //printf("p: l: 129\n");
     /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
@@ -142,8 +137,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid) 
 {
-  //printf("process_wait\n");
-  //printf(child_tid);
+  printf("process_wait\n");
     struct thread *curr = thread_current();
     struct list_elem *e;
     struct child_status *child_s;
@@ -159,31 +153,31 @@ process_wait (tid_t child_tid)
 	    break;
 	}
     }
-    //printf("163\n");
+    printf("p: 156\n");
 		      
     // If child_tid was wrong, exit
     if(!is_child) {
-      //printf("167\n");
+      printf("p: 160\n");
 	return -1;
     }
 
     // Check if we are already waiting on child
     // if not, we are now.
     if(child_s->waiting) {
-      //printf("174\n");
+      printf("p: 167\n");
 	return -1;
     }
     child_s->waiting = true;
     
     // Check if child has exited, if so get it's exit_status and return
     if(child_s->exited) {
-      //printf("193\n");
+      printf("p: 174\n");
 	int exit_status = child_s->exit_status;
 	list_remove(&(child_s->elem));
 	palloc_free_page(child_s);
 	return exit_status;
     } else {
-      //printf("199\n");
+      printf("p: 180\n");
 	// block thread since we want to wait until child has exited before
 	intr_disable();
 	thread_block();
@@ -193,7 +187,7 @@ process_wait (tid_t child_tid)
     int exit_status = child_s->exit_status;
     list_remove(&(child_s->elem));
     palloc_free_page(child_s);
-    //printf("208\n");
+    printf("p: l: 190\n");
     return exit_status;
 }
 
@@ -201,7 +195,7 @@ process_wait (tid_t child_tid)
 void
 process_exit (void)
 {
-  //printf("process_exit\n");
+  printf("p: process_exit\n");
   struct thread *cur = thread_current ();
   uint32_t *pd;
   
@@ -230,7 +224,6 @@ process_exit (void)
 void
 process_activate (void)
 {
-  //printf("process_activate\n");
   struct thread *t = thread_current ();
 
   /* Activate thread's page tables. */
@@ -318,7 +311,7 @@ bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
 
-  //printf("load\n");
+  printf("load\n");
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -392,7 +385,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
    /* Uncomment the following line to print some debug
      information. This will be useful when you debug the program
      stack.*/
-  //#define STACK_DEBUG
+#define STACK_DEBUG
 
 #ifdef STACK_DEBUG
   printf("*esp is %p\nstack contents:\n", *esp);
@@ -519,7 +512,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
-  //printf("load: DONE\n");
+  printf("load: DONE\n");
   return success;
 }
 
