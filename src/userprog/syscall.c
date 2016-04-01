@@ -15,6 +15,8 @@ static int get_four_user_bytes(const void * addr);
 static int get_user(const uint8_t *uaddr);
 static bool put_user(uint8_t *udst, uint8_t byte);
 
+static void validate_pointer(char *c, unsigned int size);
+
 void halt(void);
 void exit(int status);
 bool create(const char *file, unsigned initial_size);
@@ -25,23 +27,41 @@ int write(int fd, const void *buffer, unsigned size);
 pid_t exec(const char*);
 int wait(pid_t);
 
+static void
+validate_pointer(char *c, unsigned int size) {
+  if (size == 0) {
+    if(c == NULL || !is_user_vaddr(c) || get_user(c) == -1) {
+       thread_current()->status = -1;
+       thread_exit();
+    }
+  } else {
+    int n;
+    for(n = 0; n < size; n++) {
+      if(c+n == NULL || !is_user_vaddr(c+n) || get_user(c+n) == -1) {
+        thread_current()->status = -1;
+        thread_exit();
+      }
+    }
+  }
+}
+
 
 void
 syscall_init (void) 
 {
-  printf("s: syscall_init\n");
+  //printf("s: syscall_init\n");
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 /* Halts pintos */
 void halt(void) {
-  printf("s: halt \n");
+  //printf("s: halt \n");
   power_off();
 }
 
 /* Exit thread */
 void exit(int status) {
-    printf("%s: exit(%d)\n", thread_current()->name, status);
+  printf("%s: exit(%d)\n", thread_current()->name, status);
 
     struct thread *cur = thread_current();
     struct list_elem *e;
@@ -96,18 +116,20 @@ void exit(int status) {
 
 /* Create a file */
 bool create(const char *file, unsigned initial_size) {
-  printf("s: create \n");
+  //printf("s: create \n");
   if(file + initial_size - 1 >= PHYS_BASE || get_user((uint8_t*)(file + initial_size - 1)) == -1) {
     exit(-1);
     return -1;
   }
+
+  validate_pointer(file,initial_size);
 
   return filesys_create(file, initial_size);
 }
 
 /* Close a file if it is open */
 void close(int fd) {
-  printf("s: close \n");
+  //printf("s: close \n");
   struct thread *cur = thread_current();
   if(!bitmap_test(cur->fd_map, fd)) {
     struct file *my_file = cur->file_list[fd];
@@ -118,7 +140,7 @@ void close(int fd) {
 
 /* Read an open file */
 int read(int fd, void *buffer, unsigned size) {
-  printf("s: read \n");
+  //printf("s: read \n");
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
     exit(-1);
     return -1;
@@ -150,7 +172,7 @@ int read(int fd, void *buffer, unsigned size) {
 /* Open a created file */
 int open(const char* file) {
   struct file *f;
-  printf("s: open \n");
+  //printf("s: open \n");
   // Check that we are in uaddr and there are no segfaults
   if(file >= PHYS_BASE || get_user(file) == -1) {
     exit(-1);
@@ -180,47 +202,52 @@ int open(const char* file) {
 
 /* Write in an open file */
 int write(int fd, const void *buffer, unsigned size) {
+  //printf("s: write \n");
   int retval = -1;
-  printf("s: write \n");
+
+  validate_pointer(buffer,size);
+
   // Check that we are in uaddr and there are no segfaults
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
+    //printf("s: 187: we are not in uaddr and there are no segfaults\n");
     exit(-1);
-    return retval;
-  }
-
-  if(fd >= FD_SIZE) {
     return retval;
   }
 
   // Make sure we dont try to write to a file with an index larger than the maximum allowed open programs
   if(fd >= FD_SIZE) {
+    //printf("s: 194: fd >= FD_SIZE\n");
      return -1;
   }
 
   // Write to console
   if(fd == STDOUT_FILENO) {
+    //printf("s: 205: going to write to console\n");
     size_t offset = 0;
     while(offset + 150 < size) {
       putbuf((char*) (buffer + offset), (size_t) 150);
 	offset += 150;
     }
     putbuf((char*) (buffer + offset), (size_t) (size - offset));
+    //printf("s: 213: write to console complete\n");
     return size;
   }
 
 
   struct thread *cur = thread_current(); 
   if(!bitmap_test(cur->fd_map, fd)) {
+    //printf("s: 219\n");
     return retval;
   }  
 
   struct file *my_file = cur->file_list[fd];
   retval = file_write(my_file, buffer, size);
+  //printf("s: 225: write complete\n");
   return retval;
 }
 
 pid_t exec(const char *cmd_line) {
-  printf("s: exec \n");
+  //printf("s: exec \n");
   if(cmd_line >= PHYS_BASE || get_user(cmd_line) == -1) {
     exit(-1);
     return -1;
@@ -232,7 +259,7 @@ pid_t exec(const char *cmd_line) {
 }
 
 int wait(pid_t pid) {
-  printf("s: wait \n");
+  //printf("s: wait \n");
 
     return process_wait(pid);
 }
@@ -269,6 +296,7 @@ syscall_handler (struct intr_frame *f)
     f->eax = (uint32_t) write(get_four_user_bytes(f->esp+4),
 			      (const void*) get_four_user_bytes(f->esp+8),
 			      (unsigned) get_four_user_bytes(f->esp+12));
+    //printf("s: 281: write done\n");
     break;
   case SYS_EXEC:
     f->eax = (pid_t) exec((const char*)get_four_user_bytes(f->esp+4));
@@ -288,34 +316,28 @@ syscall_handler (struct intr_frame *f)
    and returns them as an int.
 
    Param: In-parameter should be f->esp, which is the pointer to the stack */
-static int get_four_user_bytes(const void * addr) {
-  if(is_kernel_vaddr(addr)) { exit(-1); }
+static int get_four_user_bytes(const void *addr) {
+  //printf("s: 321: get_four_user_bytes\n");
+  if(addr >= PHYS_BASE) { exit(-1); }
 
-  uint8_t *uaddr = (uint8_t*) addr;
+  uint8_t *uaddr = (uint8_t *) addr;
   
-
-  int temp;
-  int result = 0;
-  temp = get_user(uaddr);
-  if(temp == -1) { exit(-1); }
-  result += (temp << 0);
-  temp = get_user(uaddr + 1);
-  if(temp == -1) { exit(-1); }
-  result += (temp << 8);
-  temp = get_user(uaddr + 2);
-  if(temp == -1) { exit(-1); }
-  result += (temp << 16);
-  temp = get_user(uaddr + 3); 
-  if(temp == -1) { exit(-1); }
-  result += (temp << 24);
-
-  return result;
+  int i;
+  int tmp;
+  int argv = 0;
+  for(i = 0; i < 4; i++){
+    tmp = get_user(uaddr + i);
+    //printf("s: 330: %d\n",tmp);
+    if(tmp == -1){
+      thread_current()->status = -1;
+      thread_exit();
+      NOT_REACHED();
+    }
+    argv += (tmp << i*8);
+  }
+  return argv;
 }
 
-
-  // ######################################
-  // NOT MADE BY US, PROVIDED BY THE MANUAL
-  // ######################################
 
 /* Reads a byte at user virtual address UADDR.
    UADDR must be below PHYS_BASE.
@@ -325,6 +347,7 @@ static int
 get_user (const uint8_t *uaddr)
 {
   int result;
+  //printf("s: 372: uaddr: %d\n",uaddr);
   asm ("movl $1f, %0; movzbl %1, %0; 1:"
        : "=&a" (result) : "m" (*uaddr));
   return result;

@@ -32,7 +32,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *cmd_line) 
 {
-  printf("process_execute\n");
+  //printf("p: process_execute\n");
   char *fn_copy, *tmp_fn;
   tid_t tid;
 
@@ -42,19 +42,17 @@ process_execute (const char *cmd_line)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, cmd_line, PGSIZE);
-
-  printf("p: l: 45\n");
   
   /* Makes another copy to get the filename without messing with the original copy */
 
   tmp_fn = palloc_get_page(0);
   if (tmp_fn == NULL) {
-    printf("p: l: 51\n");
+    //printf("p: 51: failed to allocate tmp_fn\n");
     return TID_ERROR;
   }
   strlcpy (tmp_fn, cmd_line, PGSIZE);
 
-  printf("p: l: 54\n");
+  //printf("p: 54: succesfully allocated fn_copy and tmp_fn\n");
   // ta ut file name
   char *file_name = strtok_r(tmp_fn, " ", &tmp_fn);
 
@@ -65,11 +63,10 @@ process_execute (const char *cmd_line)
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
  
-  printf("p: l: 70\n");
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
   }
-     
+  //printf("p: 69: sucessfully created a new thread\n");
   // Check that child loaded successfully
   struct thread *child_t = get_thread_with_tid(tid);
 
@@ -89,7 +86,7 @@ process_execute (const char *cmd_line)
 static void
 start_process (void *file_name_)
 {
-  printf("p: start_process\n");
+  //printf("p: start_process\n");
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
@@ -102,18 +99,15 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  printf("p: l: 105 \n");
-
   thread_current()->load_success = success;
   
-  printf("p: l: 109\n");
   sema_up(&thread_current()->load_sema);
-  printf("p: l: 111\n");
-
     /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
     thread_exit ();
+
+  //printf("p: 110: thread loaded sucessfully \n");
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -137,7 +131,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid) 
 {
-  printf("process_wait\n");
+  //printf("process_wait\n");
     struct thread *curr = thread_current();
     struct list_elem *e;
     struct child_status *child_s;
@@ -153,31 +147,30 @@ process_wait (tid_t child_tid)
 	    break;
 	}
     }
-    printf("p: 156\n");
-		      
+    
     // If child_tid was wrong, exit
     if(!is_child) {
-      printf("p: 160\n");
+      //printf("p: 160: thread is not a child\n");
 	return -1;
     }
 
     // Check if we are already waiting on child
     // if not, we are now.
     if(child_s->waiting) {
-      printf("p: 167\n");
+      //printf("p: 167: child is waiting\n");
 	return -1;
     }
     child_s->waiting = true;
     
     // Check if child has exited, if so get it's exit_status and return
     if(child_s->exited) {
-      printf("p: 174\n");
+      //printf("p: 174: child has exited\n");
 	int exit_status = child_s->exit_status;
 	list_remove(&(child_s->elem));
 	palloc_free_page(child_s);
 	return exit_status;
     } else {
-      printf("p: 180\n");
+      //printf("p: 180: going to sleep while wating for child to exit\n");
 	// block thread since we want to wait until child has exited before
 	intr_disable();
 	thread_block();
@@ -187,7 +180,7 @@ process_wait (tid_t child_tid)
     int exit_status = child_s->exit_status;
     list_remove(&(child_s->elem));
     palloc_free_page(child_s);
-    printf("p: l: 190\n");
+    //printf("p: 190: process_wait complete\n");
     return exit_status;
 }
 
@@ -195,7 +188,7 @@ process_wait (tid_t child_tid)
 void
 process_exit (void)
 {
-  printf("p: process_exit\n");
+  //printf("p: process_exit\n");
   struct thread *cur = thread_current ();
   uint32_t *pd;
   
@@ -311,7 +304,7 @@ bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
 
-  printf("load\n");
+  //printf("p: load\n");
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -321,12 +314,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
-  if (t->pagedir == NULL) 
+  if (t->pagedir == NULL){
+    //printf("p: 325\n");
     goto done;
+  }
   process_activate ();
 
 /* Set up stack. */
   if (!setup_stack (esp)){
+    //printf("p: 332\n");
     goto done;
   }
 
@@ -337,8 +333,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   char *fn_copy;
 
   fn_copy = palloc_get_page(0);
-  if(fn_copy == NULL)
+  if(fn_copy == NULL){
+    //printf("p: 344\n");
     return TID_ERROR;
+  }
   strlcpy (fn_copy, file_name, PGSIZE);
 
   file_name = strtok_r(file_name, " ", &save_ptr);
@@ -352,7 +350,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       if (argc == 31)
 	break;
     }
-  argv[argc] = 0;
+  argv[argc] = 0; // push fake adress
 
   // Align to 4 bytes so that the processor works att full speed
   uint8_t word_align = (size_t) *esp % 4;
@@ -380,12 +378,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *esp -= sizeof(argv[argc]); // 0
   memcpy(*esp, &argv[argc], sizeof(argv[argc]));
   
-  // OUR WORK IS DONE; STACK IS FINISHED
 
    /* Uncomment the following line to print some debug
      information. This will be useful when you debug the program
      stack.*/
-#define STACK_DEBUG
+  //#define STACK_DEBUG
 
 #ifdef STACK_DEBUG
   printf("*esp is %p\nstack contents:\n", *esp);
@@ -420,13 +417,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
   }
 #endif
 
+  //printf("p: 428: %s: try to open\n",file_name);
   /* Open executable file. */
   file = filesys_open (file_name);
   if (file == NULL) 
     {
-      printf ("load: %s: open failed\n", file_name);
+      //printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
+  //printf("p: 437: %s: open succes\n",file_name);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -437,7 +436,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
     {
-      printf ("load: %s: error loading executable\n", file_name);
+      //printf ("load: %s: error loading executable\n", file_name);
       goto done; 
     }
 
@@ -500,7 +499,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
         }
     }
 
-  
+  //printf("p: 511: %s: validated and loaded\n", file_name);
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
@@ -512,7 +511,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
-  printf("load: DONE\n");
+  //printf("p: 523: load_complete \n");
   return success;
 }
 

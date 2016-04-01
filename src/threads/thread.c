@@ -92,7 +92,7 @@ static tid_t allocate_tid (void);
 void
 thread_init (void) 
 {
-  printf("t: thread_init\n");
+  //printf("t: thread_init\n");
 
   ASSERT (intr_get_level () == INTR_OFF);
 
@@ -117,7 +117,7 @@ thread_init (void)
 void
 thread_start (void) 
 {
-  printf("t: thread_start\n");
+  //printf("t: thread_start\n");
   /* Create the idle thread. */
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
@@ -135,7 +135,7 @@ thread_start (void)
 void
 thread_sleep(int64_t sleep_until) {
 
-  printf("t: thread_sleep\n");
+  //printf("t: thread_sleep\n");
   struct thread *t = thread_current ();
   
   ASSERT(!intr_context());
@@ -514,7 +514,7 @@ is_thread (struct thread *t)
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
-  printf("t: init_thread\n");
+  //printf("t: init_thread\n");
     enum intr_level old_level;
   ASSERT (t != NULL);
   ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
