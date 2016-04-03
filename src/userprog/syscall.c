@@ -15,8 +15,6 @@ static int get_four_user_bytes(const void * addr);
 static int get_user(const uint8_t *uaddr);
 static bool put_user(uint8_t *udst, uint8_t byte);
 
-static void validate_pointer(char *c, unsigned int size);
-
 void halt(void);
 void exit(int status);
 bool create(const char *file, unsigned initial_size);
@@ -26,24 +24,6 @@ int open(const char *file);
 int write(int fd, const void *buffer, unsigned size);
 pid_t exec(const char*);
 int wait(pid_t);
-
-static void
-validate_pointer(char *c, unsigned int size) {
-  if (size == 0) {
-    if(c == NULL || !is_user_vaddr(c) || get_user(c) == -1) {
-       thread_current()->status = -1;
-       thread_exit();
-    }
-  } else {
-    int n;
-    for(n = 0; n < size; n++) {
-      if(c+n == NULL || !is_user_vaddr(c+n) || get_user(c+n) == -1) {
-        thread_current()->status = -1;
-        thread_exit();
-      }
-    }
-  }
-}
 
 
 void
@@ -121,8 +101,6 @@ bool create(const char *file, unsigned initial_size) {
     exit(-1);
     return -1;
   }
-
-  validate_pointer(file,initial_size);
 
   return filesys_create(file, initial_size);
 }
@@ -204,8 +182,6 @@ int open(const char* file) {
 int write(int fd, const void *buffer, unsigned size) {
   //printf("s: write \n");
   int retval = -1;
-
-  validate_pointer(buffer,size);
 
   // Check that we are in uaddr and there are no segfaults
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
