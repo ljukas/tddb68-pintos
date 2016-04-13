@@ -262,8 +262,6 @@ thread_create (const char *name, int priority,
   // succeeded, so we dont allocate memory unnessarily
   struct child_status *child_s = palloc_get_page(0);
 
-  //palloc_free_page (tmp_fn);
-
   // Set child-parent relation info
   child_s->exit_status = -1;
   child_s->exited = false;

@@ -11,11 +11,13 @@
 #include "lib/kernel/bitmap.h"
 
 static void syscall_handler (struct intr_frame *);
-static int get_four_user_bytes(const void * addr);
+static uint32_t get_arg(const void * addr);
 static int get_user(const uint8_t *uaddr);
 static bool put_user(uint8_t *udst, uint8_t byte);
 
 static void validate_pointer(char *c, unsigned int size);
+
+static bool debug_print = true;
 
 void halt(void);
 void exit(int status);
@@ -29,17 +31,16 @@ int wait(pid_t);
 
 static void
 validate_pointer(char *c, unsigned int size) {
+  if(debug_print) printf("s: 34: validate pointer\n");
   if (size == 0) {
     if(c == NULL || !is_user_vaddr(c) || get_user(c) == -1) {
-       thread_current()->status = -1;
-       thread_exit();
+      exit(-1);
     }
   } else {
     int n;
     for(n = 0; n < size; n++) {
       if(c+n == NULL || !is_user_vaddr(c+n) || get_user(c+n) == -1) {
-        thread_current()->status = -1;
-        thread_exit();
+        exit(-1);
       }
     }
   }
@@ -49,13 +50,13 @@ validate_pointer(char *c, unsigned int size) {
 void
 syscall_init (void) 
 {
-  //printf("s: syscall_init\n");
+  if(debug_print) printf("s: syscall_init\n");
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 /* Halts pintos */
 void halt(void) {
-  //printf("s: halt \n");
+  if(debug_print) printf("s: halt \n");
   power_off();
 }
 
@@ -116,8 +117,8 @@ void exit(int status) {
 
 /* Create a file */
 bool create(const char *file, unsigned initial_size) {
-  //printf("s: create \n");
-  if(file + initial_size - 1 >= PHYS_BASE || get_user((uint8_t*)(file + initial_size - 1)) == -1) {
+  if(debug_print) printf("s: create \n");
+  if(file + initial_size - 1 >= PHYS_BASE || get_user(file + initial_size - 1) == -1) {
     exit(-1);
     return -1;
   }
@@ -129,7 +130,7 @@ bool create(const char *file, unsigned initial_size) {
 
 /* Close a file if it is open */
 void close(int fd) {
-  //printf("s: close \n");
+  if(debug_print) printf("s: close \n");
   struct thread *cur = thread_current();
   if(!bitmap_test(cur->fd_map, fd)) {
     struct file *my_file = cur->file_list[fd];
@@ -140,7 +141,7 @@ void close(int fd) {
 
 /* Read an open file */
 int read(int fd, void *buffer, unsigned size) {
-  //printf("s: read \n");
+  if(debug_print) printf("s: read \n");
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
     exit(-1);
     return -1;
@@ -172,7 +173,7 @@ int read(int fd, void *buffer, unsigned size) {
 /* Open a created file */
 int open(const char* file) {
   struct file *f;
-  //printf("s: open \n");
+  if(debug_print) printf("s: open \n");
   // Check that we are in uaddr and there are no segfaults
   if(file >= PHYS_BASE || get_user(file) == -1) {
     exit(-1);
@@ -202,52 +203,53 @@ int open(const char* file) {
 
 /* Write in an open file */
 int write(int fd, const void *buffer, unsigned size) {
-  //printf("s: write \n");
+  if(debug_print) printf("s: write \n");
   int retval = -1;
 
   validate_pointer(buffer,size);
 
   // Check that we are in uaddr and there are no segfaults
+  if(debug_print) printf("s: 212\n");
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
-    //printf("s: 187: we are not in uaddr and there are no segfaults\n");
+    if(debug_print) printf("s: 212: we are not in uaddr and there are no segfaults\n");
     exit(-1);
     return retval;
   }
 
   // Make sure we dont try to write to a file with an index larger than the maximum allowed open programs
   if(fd >= FD_SIZE) {
-    //printf("s: 194: fd >= FD_SIZE\n");
+    if(debug_print) printf("s: 219: fd >= FD_SIZE\n");
      return -1;
   }
 
   // Write to console
   if(fd == STDOUT_FILENO) {
-    //printf("s: 205: going to write to console\n");
+    if(debug_print) printf("s: 225: going to write to console\n");
     size_t offset = 0;
     while(offset + 150 < size) {
       putbuf((char*) (buffer + offset), (size_t) 150);
 	offset += 150;
     }
     putbuf((char*) (buffer + offset), (size_t) (size - offset));
-    //printf("s: 213: write to console complete\n");
+    if(debug_print) printf("s: 232: write to console complete\n");
     return size;
   }
 
 
   struct thread *cur = thread_current(); 
   if(!bitmap_test(cur->fd_map, fd)) {
-    //printf("s: 219\n");
+    if(debug_print) printf("s: 239\n");
     return retval;
   }  
 
   struct file *my_file = cur->file_list[fd];
   retval = file_write(my_file, buffer, size);
-  //printf("s: 225: write complete\n");
+  if(debug_print) printf("s: 225: write complete\n");
   return retval;
 }
 
 pid_t exec(const char *cmd_line) {
-  //printf("s: exec \n");
+  if(debug_print) printf("s: exec \n");
   if(cmd_line >= PHYS_BASE || get_user(cmd_line) == -1) {
     exit(-1);
     return -1;
@@ -259,7 +261,7 @@ pid_t exec(const char *cmd_line) {
 }
 
 int wait(pid_t pid) {
-  //printf("s: wait \n");
+  if(debug_print) printf("s: wait \n");
 
     return process_wait(pid);
 }
@@ -268,41 +270,53 @@ int wait(pid_t pid) {
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  int sys_call = get_four_user_bytes(f->esp);
+  int *esp = f->esp;
+  if(debug_print) printf("s: sys call handelr\n");
+  if(!is_user_vaddr(esp) || !is_user_vaddr(esp + 1) || !is_user_vaddr(esp + 2) || !is_user_vaddr(esp + 3)) {
+    if(debug_print) printf("s: 275\n");
+    exit(-1);
+  }
+  if(debug_print) printf("s: 279\n");
+  if(get_user(esp) == -1 || get_user(esp + 1) == -1 || get_user(esp + 2) == -1 || get_user(esp + 3) == -1){
+    if(debug_print) printf("s: 280\n");
+    exit(-1);
+  }
+
+
+  int sys_call = get_arg(f->esp);
   
   switch(sys_call) {  
   case SYS_HALT:
     halt();
     NOT_REACHED();
   case SYS_EXIT:
-      exit((int) get_four_user_bytes(f->esp+4));
+      exit((int) get_arg(f->esp+4));
       NOT_REACHED();
   case SYS_CREATE:
-    f->eax = (uint32_t) create((const char*) get_four_user_bytes(f->esp+4),
-			       (unsigned) get_four_user_bytes(f->esp+8));
+    f->eax = (uint32_t) create((const char*) get_arg(f->esp+4),
+			       (unsigned) get_arg(f->esp+8));
     break;
   case SYS_CLOSE:
-    close(get_four_user_bytes(f->esp+4));
+    close(get_arg(f->esp+4));
     break;
   case SYS_READ:
-    f->eax = (uint32_t) read(get_four_user_bytes(f->esp+4),
-			      (const void*) get_four_user_bytes(f->esp+8),
-			      (unsigned) get_four_user_bytes(f->esp+12));
+    f->eax = (uint32_t) read(get_arg(f->esp+4),
+			      (const void*) get_arg(f->esp+8),
+			      (unsigned) get_arg(f->esp+12));
     break;
   case SYS_OPEN:
-    f->eax = (uint32_t) open((const char*) get_four_user_bytes(f->esp+4));
+    f->eax = (uint32_t) open((const char*) get_arg(f->esp+4));
     break;
   case SYS_WRITE:
-    f->eax = (uint32_t) write(get_four_user_bytes(f->esp+4),
-			      (const void*) get_four_user_bytes(f->esp+8),
-			      (unsigned) get_four_user_bytes(f->esp+12));
-    //printf("s: 281: write done\n");
+    f->eax = (uint32_t) write(get_arg(f->esp+4),
+			      (const void*) get_arg(f->esp+8),
+			      (unsigned) get_arg(f->esp+12));
     break;
   case SYS_EXEC:
-    f->eax = (pid_t) exec((const char*)get_four_user_bytes(f->esp+4));
+    f->eax = (pid_t) exec((const char*)get_arg(f->esp+4));
     break;
   case SYS_WAIT:
-      f->eax = (int) wait((pid_t) get_four_user_bytes(f->esp+4));
+      f->eax = (int) wait((pid_t) get_arg(f->esp+4));
       break;
   default:
     printf("Non-implemented syscall called for - crash successful \n");
@@ -311,31 +325,23 @@ syscall_handler (struct intr_frame *f)
   }
 }
 
+
 /* All system call arguments, weather integer or pointer
    takes up 4 bytes on the stack. This function gets those 4 bytes
    and returns them as an int.
 
    Param: In-parameter should be f->esp, which is the pointer to the stack */
-static int get_four_user_bytes(const void *addr) {
-  //printf("s: 321: get_four_user_bytes\n");
-  if(addr >= PHYS_BASE) { exit(-1); }
-
-  uint8_t *uaddr = (uint8_t *) addr;
+static uint32_t get_arg(const void *addr) {
+  if(debug_print) printf("s: 321: get_arg\n");
+  if(is_kernel_vaddr(addr))
+    exit(-1);
+  if(debug_print) printf("s: 322: passed the check\n");
+  uint32_t *uaddr = (uint32_t *) addr;
   
-  int i;
-  int tmp;
-  int argv = 0;
-  for(i = 0; i < 4; i++){
-    tmp = get_user(uaddr + i);
-    //printf("s: 330: %d\n",tmp);
-    if(tmp == -1){
-      thread_current()->status = -1;
-      thread_exit();
-      NOT_REACHED();
-    }
-    argv += (tmp << i*8);
-  }
-  return argv;
+  if(get_user(uaddr + 3) != -1)
+    return *uaddr;
+  exit(-1);
+  NOT_REACHED();
 }
 
 
@@ -347,7 +353,7 @@ static int
 get_user (const uint8_t *uaddr)
 {
   int result;
-  //printf("s: 372: uaddr: %d\n",uaddr);
+  if(debug_print) printf("s: 354: uaddr: %d\n",uaddr);
   asm ("movl $1f, %0; movzbl %1, %0; 1:"
        : "=&a" (result) : "m" (*uaddr));
   return result;
