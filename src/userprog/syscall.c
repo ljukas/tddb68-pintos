@@ -14,7 +14,6 @@ static void syscall_handler (struct intr_frame *);
 static uint32_t get_arg(const void * addr);
 static int get_user(const uint8_t *uaddr);
 static bool put_user(uint8_t *udst, uint8_t byte);
-
 static void validate_pointer(char *c, unsigned int size);
 
 static bool debug_print = true;
@@ -45,7 +44,6 @@ validate_pointer(char *c, unsigned int size) {
     }
   }
 }
-
 
 void
 syscall_init (void) 
@@ -122,8 +120,6 @@ bool create(const char *file, unsigned initial_size) {
     exit(-1);
     return -1;
   }
-
-  validate_pointer(file,initial_size);
 
   return filesys_create(file, initial_size);
 }
@@ -205,8 +201,6 @@ int open(const char* file) {
 int write(int fd, const void *buffer, unsigned size) {
   if(debug_print) printf("s: write \n");
   int retval = -1;
-
-  validate_pointer(buffer,size);
 
   // Check that we are in uaddr and there are no segfaults
   if(debug_print) printf("s: 212\n");
