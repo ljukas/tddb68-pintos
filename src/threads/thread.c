@@ -15,6 +15,9 @@
 #include "userprog/process.h"
 #endif
 
+static bool debug_print = false;
+
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -92,7 +95,7 @@ static tid_t allocate_tid (void);
 void
 thread_init (void) 
 {
-  //printf("t: thread_init\n");
+  if(debug_print) printf("t: thread_init\n");
 
   ASSERT (intr_get_level () == INTR_OFF);
 
@@ -117,7 +120,7 @@ thread_init (void)
 void
 thread_start (void) 
 {
-  //printf("t: thread_start\n");
+  if(debug_print) printf("t: thread_start\n");
   /* Create the idle thread. */
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
@@ -135,7 +138,7 @@ thread_start (void)
 void
 thread_sleep(int64_t sleep_until) {
 
-  //printf("t: thread_sleep\n");
+  if(debug_print) printf("t: thread_sleep\n");
   struct thread *t = thread_current ();
   
   ASSERT(!intr_context());
@@ -219,7 +222,7 @@ tid_t
 thread_create (const char *name, int priority,
                thread_func *function, void *aux) 
 {
-  //printf("thread_create \n");
+  if(debug_print) printf("thread_create \n");
 
     // gör en struct för aux där den tar in tex 2 args
     //
@@ -512,7 +515,7 @@ is_thread (struct thread *t)
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
-  //printf("t: init_thread\n");
+  if(debug_print) printf("t: init_thread\n");
     enum intr_level old_level;
   ASSERT (t != NULL);
   ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);

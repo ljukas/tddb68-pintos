@@ -16,7 +16,7 @@ static int get_user(const uint8_t *uaddr);
 static bool put_user(uint8_t *udst, uint8_t byte);
 static void validate_pointer(char *c, unsigned int size);
 
-static bool debug_print = true;
+static bool debug_print = false;
 
 void halt(void);
 void exit(int status);
@@ -203,9 +203,9 @@ int write(int fd, const void *buffer, unsigned size) {
   int retval = -1;
 
   // Check that we are in uaddr and there are no segfaults
-  if(debug_print) printf("s: 212\n");
+  if(debug_print) printf("s: 206\n");
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
-    if(debug_print) printf("s: 212: we are not in uaddr and there are no segfaults\n");
+    if(debug_print) printf("s: 208: we are not in uaddr and there are no segfaults\n");
     exit(-1);
     return retval;
   }
@@ -264,19 +264,31 @@ int wait(pid_t pid) {
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  int *esp = f->esp;
-  if(debug_print) printf("s: sys call handelr\n");
+  int* esp = f->esp;
+  if(debug_print) printf("%d\n",esp);
+  if(debug_print) printf("s: 268: esp: %d syscall: %d\n",esp,*esp);
+  printf("esp = %d",esp);
+  int noll = 0;
+  printf(", noll = %d\n",noll);  
+  if(esp > noll){
+    //if(debug_print) 
+    printf("s: 271: %d > 0 ... obviusly.. \n",esp);
+    exit(-1);
+  }
+  
   if(!is_user_vaddr(esp) || !is_user_vaddr(esp + 1) || !is_user_vaddr(esp + 2) || !is_user_vaddr(esp + 3)) {
-    if(debug_print) printf("s: 275\n");
+    if(debug_print) printf("s: 276\n");
     exit(-1);
   }
-  if(debug_print) printf("s: 279\n");
+  if(debug_print) printf("s: 279: esp: %d\n",esp);
   if(get_user(esp) == -1 || get_user(esp + 1) == -1 || get_user(esp + 2) == -1 || get_user(esp + 3) == -1){
-    if(debug_print) printf("s: 280\n");
+    if(debug_print) printf("s: 281\n");
     exit(-1);
   }
 
+  if(debug_print) printf("s: 285\n");
 
+  //int sys_call = *esp;
   int sys_call = get_arg(f->esp);
   
   switch(sys_call) {  
@@ -305,6 +317,7 @@ syscall_handler (struct intr_frame *f)
     f->eax = (uint32_t) write(get_arg(f->esp+4),
 			      (const void*) get_arg(f->esp+8),
 			      (unsigned) get_arg(f->esp+12));
+    if(debug_print) printf("s: 316\n");
     break;
   case SYS_EXEC:
     f->eax = (pid_t) exec((const char*)get_arg(f->esp+4));
