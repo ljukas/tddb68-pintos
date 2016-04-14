@@ -10,6 +10,9 @@
 #include "userprog/process.h"
 #include "lib/kernel/bitmap.h"
 
+#define USER_VADDR_BOTTOM ((void *) 0x08048000)
+
+
 static void syscall_handler (struct intr_frame *);
 static uint32_t get_arg(const void * addr);
 static int get_user(const uint8_t *uaddr);
@@ -116,10 +119,6 @@ void exit(int status) {
 /* Create a file */
 bool create(const char *file, unsigned initial_size) {
   if(debug_print) printf("s: create \n");
-  if(file + initial_size - 1 >= PHYS_BASE || get_user(file + initial_size - 1) == -1) {
-    exit(-1);
-    return -1;
-  }
 
   return filesys_create(file, initial_size);
 }
@@ -138,14 +137,11 @@ void close(int fd) {
 /* Read an open file */
 int read(int fd, void *buffer, unsigned size) {
   if(debug_print) printf("s: read \n");
-  if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
-    exit(-1);
-    return -1;
-  }
-
+ 
   int offset;
+
    
-  if(fd >= FD_SIZE) {
+  if(fd >= FD_SIZE || fd < 0) {
     return -1;
   }
   
@@ -171,10 +167,7 @@ int open(const char* file) {
   struct file *f;
   if(debug_print) printf("s: open \n");
   // Check that we are in uaddr and there are no segfaults
-  if(file >= PHYS_BASE || get_user(file) == -1) {
-    exit(-1);
-    return -1;
-  }
+  
 
   // Check if its OK to open one more file for the thread
   int fd = bitmap_scan_and_flip(thread_current()->fd_map, 2, 1, 0);
@@ -260,64 +253,128 @@ int wait(pid_t pid) {
     return process_wait(pid);
 }
 
+void check_valid_ptr(const void *vaddr) {
+  if(!is_user_vaddr(vaddr)) 
+    {
+      if(debug_print) printf("s: %d, ptr: %d\n", __LINE__, vaddr);
+      exit(-1);
+    }
+  if(vaddr < USER_VADDR_BOTTOM) 
+    {
+      if(debug_print) printf("s: %d, ptr: %d\n", __LINE__, vaddr);
+      exit(-1);
+    }
+}
+
+int user_to_kernel_ptr(const void *vaddr) {
+  check_valid_ptr(vaddr);
+  void *ptr = pagedir_get_page(thread_current()->pagedir, vaddr);
+  if(!ptr) {
+    exit(-1);
+  }
+  return (int) ptr;
+}
+
+void check_valid_buffer(void* buffer, unsigned size) 
+{
+  unsigned i;
+  char* local_buffer = (char*) buffer;
+  for(i = 0; i < size; i++) 
+    {
+      if(debug_print) printf("s: %d, asd: %d\n", __LINE__, local_buffer);
+      //check_valid_ptr((const void*) local_buffer);
+      local_buffer++;
+    }
+  check_valid_ptr((const void*) local_buffer);
+  
+}
+
+
+void get_arg_v2(struct intr_frame *f, int *arg, int n) {
+  int i;
+  int *ptr;
+  for (i = 0; i < n; i++) {
+    ptr = (int*) f->esp + i + 1;
+    check_valid_ptr((const void*) ptr);
+    arg[i] = *ptr;
+  }
+}
+
 /* Handle all syscalls */
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  int* esp = f->esp;
-  if(debug_print) printf("%d\n",esp);
-  if(debug_print) printf("s: 268: esp: %d syscall: %d\n",esp,*esp);
-  printf("esp = %d",esp);
-  int noll = 0;
-  printf(", noll = %d\n",noll);  
-  if(esp > noll){
-    //if(debug_print) 
-    printf("s: 271: %d > 0 ... obviusly.. \n",esp);
-    exit(-1);
-  }
-  
+  //int* esp = f->esp;
+  /* 
   if(!is_user_vaddr(esp) || !is_user_vaddr(esp + 1) || !is_user_vaddr(esp + 2) || !is_user_vaddr(esp + 3)) {
     if(debug_print) printf("s: 276\n");
     exit(-1);
   }
-  if(debug_print) printf("s: 279: esp: %d\n",esp);
+ 
   if(get_user(esp) == -1 || get_user(esp + 1) == -1 || get_user(esp + 2) == -1 || get_user(esp + 3) == -1){
     if(debug_print) printf("s: 281\n");
     exit(-1);
   }
 
-  if(debug_print) printf("s: 285\n");
+  if(*esp < SYS_HALT || *esp > SYS_REMOVE) {
+    exit(-1);
+  }
+  */
+
+  if(debug_print) printf("s: %d\n", __LINE__);
 
   //int sys_call = *esp;
-  int sys_call = get_arg(f->esp);
+  //int sys_call = get_arg(f->esp);
+
+  check_valid_ptr((const void*)f->esp);
   
-  switch(sys_call) {  
+  int arg[3];
+  
+
+  switch(* (int*) f->esp) {  
   case SYS_HALT:
     halt();
     NOT_REACHED();
   case SYS_EXIT:
-      exit((int) get_arg(f->esp+4));
-      NOT_REACHED();
+    get_arg_v2(f, &arg[0], 1);
+    exit(arg[0]);
+    NOT_REACHED();
+    break;
+    
   case SYS_CREATE:
-    f->eax = (uint32_t) create((const char*) get_arg(f->esp+4),
-			       (unsigned) get_arg(f->esp+8));
+    get_arg_v2(f, &arg[0], 2);
+    arg[0] = user_to_kernel_ptr((const void*) arg[0]);
+    f->eax = create((const char*)arg[0], (unsigned) arg[1]);
     break;
   case SYS_CLOSE:
     close(get_arg(f->esp+4));
     break;
   case SYS_READ:
+    get_arg_v2(f, &arg[0], 3);
+    check_valid_buffer((void*) arg[1], (unsigned)arg[2]);
+    arg[1] = user_to_kernel_ptr((void*) arg[1]);
+    f->eax = read((int)arg[0], (const void*)arg[1], (unsigned)arg[2]);
+    break;
+    
+    /*
     f->eax = (uint32_t) read(get_arg(f->esp+4),
 			      (const void*) get_arg(f->esp+8),
 			      (unsigned) get_arg(f->esp+12));
     break;
+    */
   case SYS_OPEN:
-    f->eax = (uint32_t) open((const char*) get_arg(f->esp+4));
+    get_arg_v2(f, &arg[0], 1);
+    arg[0] = user_to_kernel_ptr((const void*) arg[0]);
+    f->eax = open((const char*)arg[0]);
+    
+
+    //f->eax = (uint32_t) open((const char*) get_arg(f->esp+4));
     break;
   case SYS_WRITE:
     f->eax = (uint32_t) write(get_arg(f->esp+4),
 			      (const void*) get_arg(f->esp+8),
 			      (unsigned) get_arg(f->esp+12));
-    if(debug_print) printf("s: 316\n");
+    if(debug_print) printf("s: %d\n", __LINE__);
     break;
   case SYS_EXEC:
     f->eax = (pid_t) exec((const char*)get_arg(f->esp+4));
@@ -339,10 +396,9 @@ syscall_handler (struct intr_frame *f)
 
    Param: In-parameter should be f->esp, which is the pointer to the stack */
 static uint32_t get_arg(const void *addr) {
-  if(debug_print) printf("s: 321: get_arg\n");
-  if(is_kernel_vaddr(addr))
-    exit(-1);
-  if(debug_print) printf("s: 322: passed the check\n");
+  
+  check_valid_ptr(addr);
+  
   uint32_t *uaddr = (uint32_t *) addr;
   
   if(get_user(uaddr + 3) != -1)
