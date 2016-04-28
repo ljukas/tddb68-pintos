@@ -15,7 +15,7 @@
 #include "userprog/process.h"
 #endif
 
-static bool debug_print = true;
+static bool debug_print = false;
 
 
 /* Random value for struct thread's `magic' member.

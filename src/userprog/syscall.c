@@ -15,7 +15,7 @@
 
 static void syscall_handler (struct intr_frame *);
 
-static bool debug_print = true;
+static bool debug_print = false;
 
 void halt(void);
 void exit(int status);

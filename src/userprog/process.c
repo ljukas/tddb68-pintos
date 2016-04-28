@@ -23,7 +23,7 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
-static bool debug_print = true;
+static bool debug_print = false;
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -494,7 +494,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file = filesys_open (file_name);
   if (file == NULL) 
     {
-      //printf ("load: %s: open failed\n", file_name);
+      printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
   if(debug_print) printf("p: 437: %s: open succes\n",file_name);
