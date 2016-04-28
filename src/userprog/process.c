@@ -74,8 +74,21 @@ process_execute (const char *cmd_line)
   // wait for child
   sema_down(&child_t->load_sema);
 
-  if(!child_t->load_success) {
-      return -1;
+  struct list_elem *e;
+  
+  for(e = list_begin(&(curr->child_threads));
+      e != list_end(&(curr->child_threads));
+      e = list_next(e)) {
+    struct child_status *child_s = list_entry(e, struct child_status, elem);
+
+    if(child_s->pid == tid) {
+      if(child_s->exited){
+	if(child_s->exit_status == -1){
+	  if(debug_print) printf("p: &d: load unsuccesful", __LINE__);
+	  return -1;
+	}
+      }
+    }
   }
 
   return tid;
@@ -98,16 +111,18 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
-  if(debug_print) printf("s: %d\n", __LINE__, success);
+  if(debug_print) printf("p: %d  load = %d\n", __LINE__, success);
   thread_current()->load_success = success;
 
-  sema_up(&thread_current()->load_sema);
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) {
+    thread_current()->exit_status = -1;
+    sema_up(&thread_current()->load_sema);
     thread_exit ();
   }
-
+  sema_up(&thread_current()->load_sema);
+  
   if(debug_print) printf("p: 110: thread loaded sucessfully \n");
 
   /* Start the user process by simulating a return from an
@@ -189,16 +204,72 @@ process_wait (tid_t child_tid)
 void
 process_exit (void)
 {
+ 
   if(debug_print) printf("p: process_exit\n");
   struct thread *cur = thread_current ();
   uint32_t *pd;
-  
- 
+  printf("%s: exit(%d)\n", cur->name, cur->exit_status); 
+
+  struct list_elem *e;
+    
+
+  // Update children
+  // Tell the chilren that we've exited
+  // That is they don't have a parent anymore
+  int i = 0;
+  if(debug_print) printf("p: %d\n",__LINE__);
+  for(e = list_begin(&(cur->child_threads));
+      e != list_end(&(cur->child_threads));
+      e = list_next(e)) {
+    i += 1;
+    if(debug_print) printf("p: %d: listelemnr %d \n",__LINE__,i);
+    struct child_status *child_s = list_entry(e, struct child_status, elem);
+
+    if(debug_print) printf("p: %d: %d\n",__LINE__,child_s->exited);
+    if(!child_s->exited) {
+
+      if(debug_print) printf("p: %d\n",__LINE__);
+      struct thread *child_t = get_thread_with_tid(child_s->pid);
+      child_t->parent_pid = 1;
+    }
+
+    if(debug_print) printf("p: %d\n",__LINE__);
+    list_remove(&(child_s->elem));
+    //minnesläcka
+    if(debug_print) printf("p: %d\n",__LINE__);
+  }
+    
+    
+  if(debug_print) printf("p: %d\n",__LINE__);
+  // Update parent
+  // Tell the parent that we've exited
+  struct thread *parent_thread = get_thread_with_tid(cur->parent_pid);
+  for(e = list_begin(&(parent_thread->child_threads));
+      e != list_end(&(parent_thread->child_threads));
+      e = list_next(e)) {
+    struct child_status *child_s = list_entry(e, struct child_status, elem);
+
+    if(child_s->pid == cur->tid) {
+
+      if(debug_print) printf("p: %d\n",__LINE__);
+      child_s->exited = true;
+      child_s->exit_status = cur->exit_status;
+      if(child_s->waiting) {
+
+	if(debug_print) printf("p: %d\n",__LINE__);
+	thread_unblock(parent_thread);
+      }
+    }
+  }
+
+  if(debug_print) printf("p: %d\n",__LINE__);
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
   if (pd != NULL) 
     {
+      if(debug_print) printf("p: %d\n",__LINE__);
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the

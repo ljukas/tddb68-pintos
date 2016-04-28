@@ -15,7 +15,7 @@
 #include "userprog/process.h"
 #endif
 
-static bool debug_print = false;
+static bool debug_print = true;
 
 
 /* Random value for struct thread's `magic' member.
@@ -364,6 +364,18 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
+
+  struct thread *cur = thread_current ();
+
+  /* Free resources for all open files */
+  int pos;
+  for(pos = 2; pos < FD_SIZE; pos++) {     // Added lab 1
+    if(bitmap_test(cur->fd_map, pos)) {
+      bitmap_reset(cur->fd_map, pos);
+      free(cur->file_list[pos]);
+    }
+  }
+
   process_exit ();
   bitmap_destroy(thread_current()->fd_map); // Added lab 1
 #endif

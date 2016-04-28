@@ -120,6 +120,7 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
     int load_success;
+    int exit_status;
     tid_t parent_pid;
     struct semaphore * load_sema;     /* Lab 3 - for the parent */
     struct list child_threads;

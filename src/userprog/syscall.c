@@ -44,54 +44,10 @@ void halt(void) {
 
 /* Exit thread */
 void exit(int status) {
-  printf("%s: exit(%d)\n", thread_current()->name, status);
+  //printf("%s: exit(%d)\n", thread_current()->name, status);
+  struct thread *cur = thread_current();
 
-    struct thread *cur = thread_current();
-    struct list_elem *e;
-    
-    // Update children
-    // Tell the chilren that we've exited
-    // That is they don't have a parent anymore
-    for(e = list_begin(&(cur->child_threads));
-	e != list_end(&(cur->child_threads));
-	e = list_next(e)) {
-	struct child_status *child_s = list_entry(e, struct child_status, elem);
-
-	if(!child_s->exited) {
-	    struct thread *child_t = get_thread_with_tid(child_s->pid);
-	    child_t->parent_pid = 1;
-	}
-	list_remove(&(child_s->elem));
-	palloc_free_page(child_s);
-    }
-    
-    
-    // Update parent
-    // Tell the parent that we've exited
-    struct thread *parent_thread = get_thread_with_tid(cur->parent_pid);
-    for(e = list_begin(&(parent_thread->child_threads));
-	e != list_end(&(parent_thread->child_threads));
-	e = list_next(e)) {
-	struct child_status *child_s = list_entry(e, struct child_status, elem);
-
-	if(child_s->pid == cur->tid) {
-	    child_s->exited = true;
-	    child_s->exit_status = status;
-	    if(child_s->waiting) {
-		thread_unblock(parent_thread);
-	    }
-	}
-    }
-    
-     /* Free resources for all open files */
-    int pos;
-    for(pos = 2; pos < FD_SIZE; pos++) {     // Added lab 1
-	if(bitmap_test(cur->fd_map, pos)) {
-	    bitmap_reset(cur->fd_map, pos);
-	    free(cur->file_list[pos]);
-	}
-    }
-    
+  cur->exit_status = status;  
     
   thread_exit();
 }
@@ -254,7 +210,7 @@ void check_valid_buffer(void* buffer, unsigned size)
   char* local_buffer = (char*) buffer;
   for(i = 0; i < size; i++) 
     {
-      if(debug_print) printf("s: %d, asd: %d\n", __LINE__, local_buffer);
+      //if(debug_print) printf("s: %d, asd: %d\n", __LINE__, local_buffer);
       check_valid_ptr((const void*) local_buffer);
       local_buffer++;
     }
