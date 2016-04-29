@@ -15,7 +15,7 @@
 
 static void syscall_handler (struct intr_frame *);
 
-static bool debug_print = false;
+static bool debug_print = true;
 
 void halt(void);
 void exit(int status);
@@ -183,16 +183,21 @@ int wait(pid_t pid) {
 }
 
 void check_valid_ptr(const void *vaddr) {
+
+  if(debug_print) printf("s: %d, ptr: %d\n", __LINE__, vaddr);
+
   if(!is_user_vaddr(vaddr)) 
     {
       if(debug_print) printf("s: %d, ptr: %d\n", __LINE__, vaddr);
       exit(-1);
     }
+
   if(vaddr < USER_VADDR_BOTTOM) 
     {
       if(debug_print) printf("s: %d, ptr: %d\n", __LINE__, vaddr);
       exit(-1);
     }
+
 }
 
 int user_to_kernel_ptr(const void *vaddr) {
@@ -235,33 +240,45 @@ syscall_handler (struct intr_frame *f)
 
 
   check_valid_ptr((const void*)f->esp);
-  
+  if(debug_print) printf("s: %d: %d\n", __LINE__,f->esp);
   int arg[3];
-  
+  int *penis = f->esp;
 
-  switch(* (int*) f->esp) {  
+  if(debug_print) printf("s: %d: %d <  %d \n", __LINE__,SYS_HALT,SYS_INUMBER);
+  
+  if(*penis < SYS_HALT || *penis > SYS_INUMBER){
+    if(debug_print) printf("s: %d\n", __LINE__);
+    exit(-1);
+  }
+
+  switch(* (int*) f->esp) {
+  if(debug_print) printf("s: %d\n", __LINE__);
   case SYS_HALT:
     halt();
     NOT_REACHED();
 
   case SYS_EXIT:
+    if(debug_print) printf("s: %d\n", __LINE__);
     get_arg_v2(f, &arg[0], 1);
     exit(arg[0]);
     NOT_REACHED();
     break;
     
   case SYS_CREATE:
+    if(debug_print) printf("s: %d\n", __LINE__);
     get_arg_v2(f, &arg[0], 2);
     arg[0] = user_to_kernel_ptr((const void*) arg[0]);
     f->eax = create((const char*)arg[0], (unsigned) arg[1]);
     break;
 
   case SYS_CLOSE:
+    if(debug_print) printf("s: %d\n", __LINE__);
     get_arg_v2(f, &arg[0], 1);
     close(arg[0]);
     break;
 
   case SYS_READ:
+    if(debug_print) printf("s: %d\n", __LINE__);
     get_arg_v2(f, &arg[0], 3);
     check_valid_buffer((void*) arg[1], (unsigned)arg[2]);
     arg[1] = user_to_kernel_ptr((void*) arg[1]);
@@ -269,12 +286,14 @@ syscall_handler (struct intr_frame *f)
     break;
    
   case SYS_OPEN:
+    if(debug_print) printf("s: %d\n", __LINE__);
     get_arg_v2(f, &arg[0], 1);
     arg[0] = user_to_kernel_ptr((const void*) arg[0]);
     f->eax = open((const char*)arg[0]);
     break;
 
   case SYS_WRITE:
+    if(debug_print) printf("s: %d\n", __LINE__);
     get_arg_v2(f, &arg[0], 3);
     check_valid_buffer((void*)arg[1], (unsigned)arg[2]);
     arg[1] = user_to_kernel_ptr((void*)arg[1]);
@@ -282,12 +301,14 @@ syscall_handler (struct intr_frame *f)
     break;
 
   case SYS_EXEC:
+    if(debug_print) printf("s: %d\n", __LINE__);
     get_arg_v2(f, &arg[0], 1);
     arg[0] = user_to_kernel_ptr((const void*)arg[0]);
     f->eax = exec((const void*)arg[0]);
     break;
 
   case SYS_WAIT:
+    if(debug_print) printf("s: %d\n", __LINE__);
     get_arg_v2(f, &arg[0], 1);
     f->eax = wait(arg[0]);
     break;

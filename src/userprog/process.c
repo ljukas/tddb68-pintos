@@ -216,27 +216,26 @@ process_exit (void)
   // Update children
   // Tell the chilren that we've exited
   // That is they don't have a parent anymore
-  int i = 0;
   if(debug_print) printf("p: %d\n",__LINE__);
-  for(e = list_begin(&(cur->child_threads));
-      e != list_end(&(cur->child_threads));
-      e = list_next(e)) {
-    i += 1;
-    if(debug_print) printf("p: %d: listelemnr %d \n",__LINE__,i);
+  e = list_begin(&(cur->child_threads));
+  while(e != list_end(&(cur->child_threads)))
+    {
+    if(debug_print) printf("p: %d: list nr %d \n",__LINE__);
     struct child_status *child_s = list_entry(e, struct child_status, elem);
-
+    
+    e = list_next(e);
+    list_remove(&(child_s->elem));
     if(debug_print) printf("p: %d: %d\n",__LINE__,child_s->exited);
-    if(!child_s->exited) {
 
-      if(debug_print) printf("p: %d\n",__LINE__);
+
+
+    if(!child_s->exited) {
       struct thread *child_t = get_thread_with_tid(child_s->pid);
       child_t->parent_pid = 1;
-    }
 
-    if(debug_print) printf("p: %d\n",__LINE__);
-    list_remove(&(child_s->elem));
-    //minnesläcka
-    if(debug_print) printf("p: %d\n",__LINE__);
+    } else {
+      palloc_free_page(child_s); // NO MORE (purjo)LEEKS
+    }
   }
     
     
@@ -244,6 +243,9 @@ process_exit (void)
   // Update parent
   // Tell the parent that we've exited
   struct thread *parent_thread = get_thread_with_tid(cur->parent_pid);
+  if(parent_thread == NULL){
+    palloc_free_page(cur->my_status);
+  }
   for(e = list_begin(&(parent_thread->child_threads));
       e != list_end(&(parent_thread->child_threads));
       e = list_next(e)) {
