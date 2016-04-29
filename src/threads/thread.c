@@ -270,6 +270,8 @@ thread_create (const char *name, int priority,
   child_s->exited = false;
   child_s->waiting = false;
   child_s->pid = tid;
+  
+  t->my_status = child_s;
 
   sema_init(&t->load_sema, 0);
  

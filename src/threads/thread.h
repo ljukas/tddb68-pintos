@@ -124,6 +124,7 @@ struct thread
     tid_t parent_pid;
     struct semaphore * load_sema;     /* Lab 3 - for the parent */
     struct list child_threads;
+    struct child_status * my_status;
     /* File desriptors */
     struct bitmap * fd_map;             // Added lab 1
 #endif
