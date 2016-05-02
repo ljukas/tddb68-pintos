@@ -15,7 +15,7 @@
 
 static void syscall_handler (struct intr_frame *);
 
-static bool debug_print = true;
+static bool debug_print = false;
 
 void halt(void);
 void exit(int status);
@@ -28,6 +28,18 @@ pid_t exec(const char*);
 int wait(pid_t);
 
 
+/* Reads a byte at user virtual address UADDR.
+   UADDR must be below PHYS_BASE.
+   Returns the byte value if successful, -1 if a segfault
+   occurred. */
+static int
+get_user (const uint8_t *uaddr)
+{
+  int result;
+  asm ("movl $1f, %0; movzbl %1, %0; 1:"
+     : "=&a" (result) : "m" (*uaddr));
+  return result;
+}
 
 void
 syscall_init (void) 
@@ -238,15 +250,24 @@ syscall_handler (struct intr_frame *f)
 {
   if(debug_print) printf("s: %d\n", __LINE__);
 
-
   check_valid_ptr((const void*)f->esp);
-  if(debug_print) printf("s: %d: %d\n", __LINE__,f->esp);
   int arg[3];
-  int *penis = f->esp;
+  int *esp = f->esp;
 
-  if(debug_print) printf("s: %d: %d <  %d \n", __LINE__,SYS_HALT,SYS_INUMBER);
+
+  /* Check so pointers aren't in kernel memory. */
+  if(!is_user_vaddr(esp) || !is_user_vaddr(esp + 1) || !is_user_vaddr(esp + 2) || !is_user_vaddr(esp + 3)) {
+    if(debug_print) printf("s: %d: %d\n", __LINE__,f->esp);
+    exit(-1);
+  }
   
-  if(*penis < SYS_HALT || *penis > SYS_INUMBER){
+  if(get_user(esp) == -1 || get_user(esp + 1) == -1 || get_user(esp + 2) == -1 || get_user(esp + 3) == -1){
+    if(debug_print) printf("s: %d: %d\n", __LINE__,f->esp);
+    exit(-1);
+  }
+
+  
+  if(*esp < SYS_HALT || *esp > SYS_INUMBER){
     if(debug_print) printf("s: %d\n", __LINE__);
     exit(-1);
   }
