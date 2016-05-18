@@ -6,6 +6,7 @@
 #include "filesys/filesys.h"
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
+#include "threads/synch.h"
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
@@ -37,6 +38,11 @@ struct inode
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
     struct inode_disk data;             /* Inode content. */
+
+    lock wrt;
+    lock mutex;
+    int r_count;
+
   };
 
 /* Returns the disk sector that contains byte offset POS within
@@ -74,6 +80,7 @@ inode_create (disk_sector_t sector, off_t length)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
+
 
   ASSERT (length >= 0);
 
@@ -137,6 +144,11 @@ inode_open (disk_sector_t sector)
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
+  /*init locks */
+  lock_init(&(inode->wrt));
+  lock_init(&(inode->mutex));
+  inode->r_count = 0;
+
   disk_read (filesys_disk, inode->sector, &inode->data);
   return inode;
 }
@@ -207,6 +219,13 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   off_t bytes_read = 0;
   uint8_t *bounce = NULL;
 
+  lock_acquire(&(inode->mutex));
+  inode->r_count++;
+  if(inode->r_count == 1) {
+    lock_acquire(&(inode->wrt));
+  }
+  lock_release(&(inode->mutex));
+
   while (size > 0) 
     {
       /* Disk sector to read, starting byte offset within sector. */
@@ -248,6 +267,14 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       bytes_read += chunk_size;
     }
   free (bounce);
+  
+  lock_acquire(&(inode->mutex));
+  inode->r_count--;
+  if(inode->r_count == 0) {
+    lock_release(&(inode->wrt));
+  }
+  lock_release(&(inode->mutex));
+
 
   return bytes_read;
 }
@@ -267,7 +294,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   if (inode->deny_write_cnt)
     return 0;
-
+  
+  lock_acquire(&(inode->wrt));
   while (size > 0) 
     {
       /* Sector to write, starting byte offset within sector. */
@@ -316,7 +344,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       bytes_written += chunk_size;
     }
   free (bounce);
-
+  lock_release(&(inode->wrt));
   return bytes_written;
 }
 

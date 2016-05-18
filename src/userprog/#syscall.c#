@@ -138,6 +138,7 @@ read(int fd, void *buffer, unsigned size) {
   struct thread *cur = thread_current();
   struct file *my_file = cur->file_list[fd];
 
+
   if(bitmap_test(cur->fd_map, fd)) { 
     return (int) file_read(my_file, buffer, size);
   }

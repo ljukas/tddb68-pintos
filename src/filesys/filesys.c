@@ -74,6 +74,8 @@ filesys_open (const char *name)
     dir_lookup (dir, name, &inode);
   dir_close (dir);
 
+  if(inode->removed) return -1;   //lab4
+
   return file_open (inode);
 }
 
