@@ -43,6 +43,7 @@ struct inode
     struct semaphore mutex;
     int r_count;
     struct lock remove_lock;
+    struct lock 
 
   };
 

@@ -224,8 +224,7 @@ thread_create (const char *name, int priority,
 {
   if(debug_print) printf("thread_create \n");
 
-    // gör en struct för aux där den tar in tex 2 args
-    //
+
   struct thread *t;
   struct kernel_thread_frame *kf;
   struct switch_entry_frame *ef;

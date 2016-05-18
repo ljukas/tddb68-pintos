@@ -55,22 +55,22 @@ syscall_init (void)
 
 void 
 seek(int fd, unsigned pos){
-  
+  file_seek(thread_current()->file_list[fd], pos);
 }
 
 unsigned 
 tell(int fd){
-
+  return file_tell(thread_current()->file_list[fd]);
 }
 
 int 
 filesize(int fd){
-
+  return file_length(thread_current()->file_list[fd]);
 }
 
 bool 
 remove(const char *file){
-
+  return filesys_remove(file);
 }
 
 
@@ -84,11 +84,8 @@ halt(void) {
 /* Exit thread */
 void 
 exit(int status) {
-  //printf("%s: exit(%d)\n", thread_current()->name, status);
   struct thread *cur = thread_current();
-
   cur->exit_status = status;  
-    
   thread_exit();
 }
 
@@ -97,7 +94,6 @@ exit(int status) {
 bool 
 create(const char *file, unsigned initial_size) {
   if(debug_print) printf("s: create \n");
-
   return filesys_create(file, initial_size);
 }
 
@@ -266,7 +262,6 @@ check_valid_buffer(void* buffer, unsigned size)
   char* local_buffer = (char*) buffer;
   for(i = 0; i < size; i++) 
     {
-      //if(debug_print) printf("s: %d, asd: %d\n", __LINE__, local_buffer);
       check_valid_ptr((const void*) local_buffer);
       local_buffer++;
     }
@@ -274,7 +269,7 @@ check_valid_buffer(void* buffer, unsigned size)
 
 
 void 
-get_arg_v2(struct intr_frame *f, int *arg, int n) {
+get_arg(struct intr_frame *f, int *arg, int n) {
   int i;
   int *ptr;
   for (i = 0; i < n; i++) {
@@ -289,10 +284,6 @@ static void
 syscall_handler (struct intr_frame *f) 
 {
   if(debug_print) printf("s: %d\n", __LINE__);
-
-  if(!file_lock_init){
-    lock_init(file_lock);
-  }
 
   check_valid_ptr((const void*)f->esp);
   int arg[3];
@@ -324,27 +315,27 @@ syscall_handler (struct intr_frame *f)
 
   case SYS_EXIT:
     if(debug_print) printf("s: %d\n", __LINE__);
-    get_arg_v2(f, &arg[0], 1);
+    get_arg(f, &arg[0], 1);
     exit(arg[0]);
     NOT_REACHED();
     break;
     
   case SYS_CREATE:
     if(debug_print) printf("s: %d\n", __LINE__);
-    get_arg_v2(f, &arg[0], 2);
+    get_arg(f, &arg[0], 2);
     arg[0] = user_to_kernel_ptr((const void*) arg[0]);
     f->eax = create((const char*)arg[0], (unsigned) arg[1]);
     break;
 
   case SYS_CLOSE:
     if(debug_print) printf("s: %d\n", __LINE__);
-    get_arg_v2(f, &arg[0], 1);
+    get_arg(f, &arg[0], 1);
     close(arg[0]);
     break;
 
   case SYS_READ:
     if(debug_print) printf("s: %d\n", __LINE__);
-    get_arg_v2(f, &arg[0], 3);
+    get_arg(f, &arg[0], 3);
     check_valid_buffer((void*) arg[1], (unsigned)arg[2]);
     arg[1] = user_to_kernel_ptr((void*) arg[1]);
     f->eax = read((int)arg[0], (const void*)arg[1], (unsigned)arg[2]);
@@ -352,14 +343,14 @@ syscall_handler (struct intr_frame *f)
    
   case SYS_OPEN:
     if(debug_print) printf("s: %d\n", __LINE__);
-    get_arg_v2(f, &arg[0], 1);
+    get_arg(f, &arg[0], 1);
     arg[0] = user_to_kernel_ptr((const void*) arg[0]);
     f->eax = open((const char*)arg[0]);
     break;
 
   case SYS_WRITE:
     if(debug_print) printf("s: %d\n", __LINE__);
-    get_arg_v2(f, &arg[0], 3);
+    get_arg(f, &arg[0], 3);
     check_valid_buffer((void*)arg[1], (unsigned)arg[2]);
     arg[1] = user_to_kernel_ptr((void*)arg[1]);
     f->eax = write((int)arg[0], (const void*)arg[1], (unsigned)arg[2]);
@@ -367,17 +358,40 @@ syscall_handler (struct intr_frame *f)
 
   case SYS_EXEC:
     if(debug_print) printf("s: %d\n", __LINE__);
-    get_arg_v2(f, &arg[0], 1);
+    get_arg(f, &arg[0], 1);
     arg[0] = user_to_kernel_ptr((const void*)arg[0]);
     f->eax = exec((const void*)arg[0]);
     break;
 
   case SYS_WAIT:
     if(debug_print) printf("s: %d\n", __LINE__);
-    get_arg_v2(f, &arg[0], 1);
+    get_arg(f, &arg[0], 1);
     f->eax = wait(arg[0]);
     break;
 
+  case SYS_REMOVE:
+    if(debug_print) printf("s: %d\n", __LINE__);
+    get_arg(f, &arg[0], 1);
+    f->eax = remove((const char *)arg[0]);
+    break;
+
+  case SYS_FILESIZE:
+    if(debug_print) printf("s: %d\n", __LINE__);
+    get_arg(f, &arg[0], 1);
+    f->eax = filesize((int) arg[0]);
+    break;
+
+  case SYS_SEEK:
+    if(debug_print) printf("s: %d\n", __LINE__);
+    get_arg(f, &arg[0], 2);
+    seek((int) arg[0], (unsigned) arg[1]);
+    break;
+
+  case SYS_TELL:
+    if(debug_print) printf("s: %d\n", __LINE__);
+    get_arg(f, &arg[0], 1);
+    f->eax = tell((int) arg[0]);
+    break;
   default:
     printf("Non-implemented syscall called for - crash successful \n");
     thread_exit();
