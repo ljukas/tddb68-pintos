@@ -100,13 +100,13 @@ create(const char *file, unsigned initial_size) {
 /* Close a file if it is open */
 void 
 close(int fd) {
-  if(debug_print) printf("s: close \n");
+  if(debug_print) printf("s: t: %d close fd: %d \n",thread_current()->tid, fd);
   if(fd >= FD_SIZE || fd < 0) {
     return -1;
   }
 
   struct thread *cur = thread_current();
-  if(!bitmap_test(cur->fd_map, fd)) {
+  if(bitmap_test(cur->fd_map, fd)) {
     struct file *my_file = cur->file_list[fd];
     file_close(my_file);
     bitmap_reset(cur->fd_map, fd);
@@ -116,7 +116,7 @@ close(int fd) {
 /* Read an open file */
 int 
 read(int fd, void *buffer, unsigned size) {
-  if(debug_print) printf("s: read \n");
+  if(debug_print) printf("s: t: %d read \n", thread_current()->tid);
  
   int offset;
    
@@ -145,7 +145,7 @@ read(int fd, void *buffer, unsigned size) {
 int 
 open(const char* file) {
   struct file *f;
-  if(debug_print) printf("s: open \n");
+  if(debug_print) printf("s: t: %d  open \n", thread_current()->tid);
   // Check that we are in uaddr and there are no segfaults
   
 
@@ -173,38 +173,38 @@ open(const char* file) {
 /* Write in an open file */
 int 
 write(int fd, const void *buffer, unsigned size) {
-  if(debug_print) printf("s: write \n");
+  if(debug_print) printf("s: t: %d write %d\n", fd, thread_current()->tid);
   int retval = -1;
 
   // Make sure we dont try to write to a file with an index larger than the maximum allowed open programs
   if(fd >= FD_SIZE || fd < 0) {
-    if(debug_print) printf("s: 219: fd >= FD_SIZE\n");
+    if(debug_print) printf("s: %d: fd(%d) >= FD_SIZE\n", __LINE__, fd);
      return -1;
   }
 
   // Write to console
   if(fd == STDOUT_FILENO) {
-    if(debug_print) printf("s: 225: going to write to console\n");
+    if(debug_print) printf("s: %d: going to write to console\n",__LINE__);
     size_t offset = 0;
     while(offset + 150 < size) {
       putbuf((char*) (buffer + offset), (size_t) 150);
 	offset += 150;
     }
     putbuf((char*) (buffer + offset), (size_t) (size - offset));
-    if(debug_print) printf("s: 232: write to console complete\n");
+    if(debug_print) printf("s: %d: write to console complete\n", __LINE__);
     return size;
   }
 
 
   struct thread *cur = thread_current(); 
   if(!bitmap_test(cur->fd_map, fd)) {
-    if(debug_print) printf("s: 239\n");
+    if(debug_print) printf("s: %d\n", __LINE__);
     return retval;
   }  
 
   struct file *my_file = cur->file_list[fd];
   retval = file_write(my_file, buffer, size);
-  if(debug_print) printf("s: 225: write complete\n");
+  if(debug_print) printf("s: %d: write complete\n", __LINE__);
   return retval;
 }
 
@@ -224,12 +224,10 @@ wait(pid_t pid) {
     return process_wait(pid);
 }
 
-
-
 void 
 check_valid_ptr(const void *vaddr) {
 
-  if(debug_print) printf("s: %d, ptr: %d\n", __LINE__, vaddr);
+  //if(debug_print) printf("s: %d, ptr: %d\n", __LINE__, vaddr);
 
   if(!is_user_vaddr(vaddr)) 
     {
@@ -283,7 +281,7 @@ get_arg(struct intr_frame *f, int *arg, int n) {
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  if(debug_print) printf("s: %d\n", __LINE__);
+  //if(debug_print) printf("s: %d\n", __LINE__);
 
   check_valid_ptr((const void*)f->esp);
   int arg[3];
@@ -314,27 +312,27 @@ syscall_handler (struct intr_frame *f)
     NOT_REACHED();
 
   case SYS_EXIT:
-    if(debug_print) printf("s: %d\n", __LINE__);
+    //if(debug_print) printf("s: %d\n", __LINE__);
     get_arg(f, &arg[0], 1);
     exit(arg[0]);
     NOT_REACHED();
     break;
     
   case SYS_CREATE:
-    if(debug_print) printf("s: %d\n", __LINE__);
+    //if(debug_print) printf("s: %d\n", __LINE__);
     get_arg(f, &arg[0], 2);
     arg[0] = user_to_kernel_ptr((const void*) arg[0]);
     f->eax = create((const char*)arg[0], (unsigned) arg[1]);
     break;
 
   case SYS_CLOSE:
-    if(debug_print) printf("s: %d\n", __LINE__);
+    //if(debug_print) printf("s: %d\n", __LINE__);
     get_arg(f, &arg[0], 1);
     close(arg[0]);
     break;
 
   case SYS_READ:
-    if(debug_print) printf("s: %d\n", __LINE__);
+    //if(debug_print) printf("s: %d\n", __LINE__);
     get_arg(f, &arg[0], 3);
     check_valid_buffer((void*) arg[1], (unsigned)arg[2]);
     arg[1] = user_to_kernel_ptr((void*) arg[1]);
@@ -342,14 +340,14 @@ syscall_handler (struct intr_frame *f)
     break;
    
   case SYS_OPEN:
-    if(debug_print) printf("s: %d\n", __LINE__);
+    //if(debug_print) printf("s: %d\n", __LINE__);
     get_arg(f, &arg[0], 1);
     arg[0] = user_to_kernel_ptr((const void*) arg[0]);
     f->eax = open((const char*)arg[0]);
     break;
 
   case SYS_WRITE:
-    if(debug_print) printf("s: %d\n", __LINE__);
+    //if(debug_print) printf("s: %d\n", __LINE__);
     get_arg(f, &arg[0], 3);
     check_valid_buffer((void*)arg[1], (unsigned)arg[2]);
     arg[1] = user_to_kernel_ptr((void*)arg[1]);
@@ -357,38 +355,38 @@ syscall_handler (struct intr_frame *f)
     break;
 
   case SYS_EXEC:
-    if(debug_print) printf("s: %d\n", __LINE__);
+    //if(debug_print) printf("s: %d\n", __LINE__);
     get_arg(f, &arg[0], 1);
     arg[0] = user_to_kernel_ptr((const void*)arg[0]);
     f->eax = exec((const void*)arg[0]);
     break;
 
   case SYS_WAIT:
-    if(debug_print) printf("s: %d\n", __LINE__);
+    //if(debug_print) printf("s: %d\n", __LINE__);
     get_arg(f, &arg[0], 1);
     f->eax = wait(arg[0]);
     break;
 
   case SYS_REMOVE:
-    if(debug_print) printf("s: %d\n", __LINE__);
+    //if(debug_print) printf("s: %d\n", __LINE__);
     get_arg(f, &arg[0], 1);
     f->eax = remove((const char *)arg[0]);
     break;
 
   case SYS_FILESIZE:
-    if(debug_print) printf("s: %d\n", __LINE__);
+    //if(debug_print) printf("s: %d\n", __LINE__);
     get_arg(f, &arg[0], 1);
     f->eax = filesize((int) arg[0]);
     break;
 
   case SYS_SEEK:
-    if(debug_print) printf("s: %d\n", __LINE__);
+    //if(debug_print) printf("s: %d\n", __LINE__);
     get_arg(f, &arg[0], 2);
     seek((int) arg[0], (unsigned) arg[1]);
     break;
 
   case SYS_TELL:
-    if(debug_print) printf("s: %d\n", __LINE__);
+    //if(debug_print) printf("s: %d\n", __LINE__);
     get_arg(f, &arg[0], 1);
     f->eax = tell((int) arg[0]);
     break;

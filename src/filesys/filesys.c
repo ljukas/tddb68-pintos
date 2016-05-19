@@ -70,6 +70,7 @@ filesys_create (const char *name, off_t initial_size)
 struct file *
 filesys_open (const char *name)
 {
+  lock_acquire(&create_lock);
   struct dir *dir = dir_open_root ();
   struct inode *inode = NULL;
 
@@ -77,7 +78,7 @@ filesys_open (const char *name)
     dir_lookup (dir, name, &inode);
   dir_close (dir);
 
-
+  lock_release(&create_lock);
   return file_open (inode);
 }
 

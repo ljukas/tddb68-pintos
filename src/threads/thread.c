@@ -273,7 +273,6 @@ thread_create (const char *name, int priority,
   t->my_status = child_s;
 
   sema_init(&t->load_sema, 0);
- 
   struct thread *parent = thread_current();
   //need to lock
   list_push_back(&parent->child_threads, &child_s->elem);
@@ -370,15 +369,19 @@ thread_exit (void)
 
   /* Free resources for all open files */
   int pos;
-  for(pos = 2; pos < FD_SIZE; pos++) {     // Added lab 1
-    if(bitmap_test(cur->fd_map, pos)) {
-      bitmap_reset(cur->fd_map, pos);
-      free(cur->file_list[pos]);
-    }
-  }
+  if(debug_print) printf("closing tid: %d\n",cur->tid);
+  if(cur->fd_map != NULL) {
+     for(pos = 2; pos < FD_SIZE - 1; pos++) {     // Added lab 1
+        if(bitmap_test(cur->fd_map, pos)) {
+           bitmap_reset(cur->fd_map, pos);
+           free(cur->file_list[pos]);
+         }
+      }
+   
 
-  process_exit ();
   bitmap_destroy(thread_current()->fd_map); // Added lab 1
+  }
+  process_exit ();
 #endif
     
   /* Just set our status to dying and schedule another process.
@@ -549,7 +552,6 @@ init_thread (struct thread *t, const char *name, int priority)
   list_push_back(&thread_list, &t->thread_elem);
   intr_set_level(old_level);
   
- 
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
