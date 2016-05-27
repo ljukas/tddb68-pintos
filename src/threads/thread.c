@@ -269,14 +269,13 @@ thread_create (const char *name, int priority,
   child_s->exited = false;
   child_s->waiting = false;
   child_s->pid = tid;
+  sema_init(&(child_s->sema_exit),1);
   
   t->my_status = child_s;
 
   sema_init(&t->load_sema, 0);
   struct thread *parent = thread_current();
-  //need to lock
   list_push_back(&parent->child_threads, &child_s->elem);
-  //need to unlock
   #endif
   
   /* Add to run queue. */

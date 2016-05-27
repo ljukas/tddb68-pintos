@@ -43,7 +43,7 @@ struct inode
     struct semaphore mutex;
     int r_count;
     struct lock remove_lock;
-    struct lock 
+    
 
   };
 
@@ -123,6 +123,7 @@ inode_open (disk_sector_t sector)
   struct list_elem *e;
   struct inode *inode;
 
+  // Lås id 5
   /* Check whether this inode is already open. */
   for (e = list_begin (&open_inodes); e != list_end (&open_inodes);
        e = list_next (e)) 
@@ -163,7 +164,11 @@ inode_reopen (struct inode *inode)
   if (inode != NULL) 
     {
       ASSERT(inode->open_cnt != 0);
+      
+      lock_acquire(&(inode->remove_lock));
       inode->open_cnt++;
+      lock_release(&(inode->remove_lock));
+
     }
   return inode;
 }
@@ -185,12 +190,15 @@ inode_close (struct inode *inode)
   if (inode == NULL)
     return;
 
+  
+  lock_acquire(&(inode->remove_lock));
   /* Release resources if this was the last opener. */
   if (--inode->open_cnt == 0)
     {
       /* Remove from inode list and release lock. */
+      // Lås id 5
       list_remove (&inode->elem);
-      lock_acquire(&(inode->remove_lock));
+
       /* Deallocate blocks if removed. */
       if (inode->removed) 
         {
@@ -198,9 +206,9 @@ inode_close (struct inode *inode)
           free_map_release (inode->data.start,
                             bytes_to_sectors (inode->data.length)); 
         }
-      lock_release(&(inode->remove_lock));
       free (inode); 
     }
+   lock_release(&(inode->remove_lock));
 }
 
 /* Marks INODE to be deleted when it is closed by the last caller who
@@ -208,11 +216,9 @@ inode_close (struct inode *inode)
 void
 inode_remove (struct inode *inode) 
 {
-  lock_acquire(&(inode->remove_lock));
   ASSERT (inode != NULL);
   inode->removed = true;
-  lock_release(&(inode->remove_lock));
-}
+ }
 
 /* Reads SIZE bytes from INODE into BUFFER, starting at position OFFSET.
    Returns the number of bytes actually read, which may be less

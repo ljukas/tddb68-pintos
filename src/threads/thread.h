@@ -89,6 +89,7 @@ typedef int tid_t;
 
 struct child_status {
     struct list_elem elem;
+  struct lock sema_exit;
     int exit_status;
     bool exited;
     bool waiting;

@@ -32,6 +32,8 @@ unsigned tell(int fd);
 int filesize(int fd);
 bool remove(const char *file);
 
+void isBufferOk(const char *f);
+
 /* Reads a byte at user virtual address UADDR.
    UADDR must be below PHYS_BASE.
    Returns the byte value if successful, -1 if a segfault
@@ -94,6 +96,7 @@ exit(int status) {
 bool 
 create(const char *file, unsigned initial_size) {
   if(debug_print) printf("s: create \n");
+  isBufferOk(file);
   return filesys_create(file, initial_size);
 }
 
@@ -229,7 +232,7 @@ check_valid_ptr(const void *vaddr) {
 
   //if(debug_print) printf("s: %d, ptr: %d\n", __LINE__, vaddr);
 
-  if(!is_user_vaddr(vaddr)) 
+  if(is_kernel_vaddr(vaddr)) 
     {
       if(debug_print) printf("s: %d, ptr: %d\n", __LINE__, vaddr);
       exit(-1);
@@ -277,6 +280,19 @@ get_arg(struct intr_frame *f, int *arg, int n) {
   }
 }
 
+void
+isBufferOk(const char *f){
+  const char *p;
+  for(p = f; *p != '\0'; p++) {
+    if(debug_print) printf("s: %d\n", __LINE__);
+    if(is_user_vaddr(p)) 
+    {
+      if(debug_print) printf("s: %d\n", __LINE__);
+      exit(-1);
+    }
+  }
+}
+
 /* Handle all syscalls */
 static void
 syscall_handler (struct intr_frame *f) 
@@ -287,6 +303,7 @@ syscall_handler (struct intr_frame *f)
   int arg[3];
   int *esp = f->esp;
 
+  // (find null-terminator for strings
 
   /* Check so pointers aren't in kernel memory. */
   if(!is_user_vaddr(esp) || !is_user_vaddr(esp + 1) || !is_user_vaddr(esp + 2) || !is_user_vaddr(esp + 3)) {

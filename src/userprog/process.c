@@ -204,9 +204,10 @@ process_wait (tid_t child_tid)
 void
 process_exit (void)
 {
- 
+  
   if(debug_print) printf("p: process_exit\n");
   struct thread *cur = thread_current ();
+  sema_down(&(cur->my_status->sema_exit));
   uint32_t *pd;
   printf("%s: exit(%d)\n", cur->name, cur->exit_status); 
 
@@ -228,10 +229,12 @@ process_exit (void)
     if(debug_print) printf("p: %d: %d\n",__LINE__,child_s->exited);
 
 
-
+    
+    sema_down(&(child_s->sema_exit));
     if(!child_s->exited) {
       struct thread *child_t = get_thread_with_tid(child_s->pid);
       child_t->parent_pid = 1;
+      sema_up(&(child_s->sema_exit));
 
     } else {
       palloc_free_page(child_s); // NO MORE (purjo)LEEKS
@@ -264,6 +267,8 @@ process_exit (void)
     }
   }
 
+  sema_up(&(cur->my_status->sema_exit));
+ 
   if(debug_print) printf("p: %d\n",__LINE__);
 
   /* Destroy the current process's page directory and switch back
