@@ -32,7 +32,7 @@ unsigned tell(int fd);
 int filesize(int fd);
 bool remove(const char *file);
 
-void isBufferOk(const char *f);
+void is_buffer_ok(const char *f);
 
 /* Reads a byte at user virtual address UADDR.
    UADDR must be below PHYS_BASE.
@@ -96,7 +96,7 @@ exit(int status) {
 bool 
 create(const char *file, unsigned initial_size) {
   if(debug_print) printf("s: create \n");
-  isBufferOk(file);
+  is_buffer_ok(file);
   return filesys_create(file, initial_size);
 }
 
@@ -230,20 +230,13 @@ wait(pid_t pid) {
 void 
 check_valid_ptr(const void *vaddr) {
 
-  //if(debug_print) printf("s: %d, ptr: %d\n", __LINE__, vaddr);
+  //if(debug_print) printf("s: %d, ptr: %d\n", __LINE__, vaddr); 
+  struct thread *t = thread_current();
 
-  if(is_kernel_vaddr(vaddr)) 
-    {
-      if(debug_print) printf("s: %d, ptr: %d\n", __LINE__, vaddr);
-      exit(-1);
-    }
-
-  if(vaddr < USER_VADDR_BOTTOM) 
-    {
-      if(debug_print) printf("s: %d, ptr: %d\n", __LINE__, vaddr);
-      exit(-1);
-    }
-
+  if(vaddr == NULL || !is_user_vaddr(vaddr) ||
+     pagedir_get_page(t->pagedir, vaddr) == NULL){
+    exit(-1);
+  }
 }
 
 int 
@@ -281,7 +274,7 @@ get_arg(struct intr_frame *f, int *arg, int n) {
 }
 
 void
-isBufferOk(const char *f){
+is_buffer_ok(const char *f){
   const char *p;
   for(p = f; *p != '\0'; p++) {
     if(debug_print) printf("s: %d\n", __LINE__);
