@@ -42,7 +42,7 @@ struct inode
     struct semaphore wrt;
     struct semaphore mutex;
     int r_count;
-    struct lock remove_lock;
+    struct semaphore remove_sema;
     
 
   };
@@ -151,7 +151,7 @@ inode_open (disk_sector_t sector)
   sema_init(&(inode->wrt), 1);
   sema_init(&(inode->mutex), 1);
   inode->r_count = 0;
-  lock_init(&(inode->remove_lock));
+  sema_init(&(inode->remove_sema), 1);
 
   disk_read (filesys_disk, inode->sector, &inode->data);
   return inode;
@@ -165,9 +165,9 @@ inode_reopen (struct inode *inode)
     {
       ASSERT(inode->open_cnt != 0);
       
-      lock_acquire(&(inode->remove_lock));
+      sema_down(&(inode->remove_sema));
       inode->open_cnt++;
-      lock_release(&(inode->remove_lock));
+      sema_up(&(inode->remove_sema));
 
     }
   return inode;
@@ -191,7 +191,7 @@ inode_close (struct inode *inode)
     return;
 
   
-  lock_acquire(&(inode->remove_lock));
+  sema_down(&(inode->remove_sema));
   /* Release resources if this was the last opener. */
   if (--inode->open_cnt == 0)
     {
@@ -208,7 +208,9 @@ inode_close (struct inode *inode)
         }
       free (inode); 
     }
-   lock_release(&(inode->remove_lock));
+  else {
+    sema_up(&(inode->remove_sema));
+  }
 }
 
 /* Marks INODE to be deleted when it is closed by the last caller who

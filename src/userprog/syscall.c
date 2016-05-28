@@ -32,7 +32,7 @@ unsigned tell(int fd);
 int filesize(int fd);
 bool remove(const char *file);
 
-void is_buffer_ok(const char *f);
+void check_valid_string(const char *f);
 
 /* Reads a byte at user virtual address UADDR.
    UADDR must be below PHYS_BASE.
@@ -96,7 +96,7 @@ exit(int status) {
 bool 
 create(const char *file, unsigned initial_size) {
   if(debug_print) printf("s: create \n");
-  is_buffer_ok(file);
+  check_valid_string(file);
   return filesys_create(file, initial_size);
 }
 
@@ -150,7 +150,7 @@ open(const char* file) {
   struct file *f;
   if(debug_print) printf("s: t: %d  open \n", thread_current()->tid);
   // Check that we are in uaddr and there are no segfaults
-  
+  check_valid_string(file);
 
   // Check if its OK to open one more file for the thread
   int fd = bitmap_scan_and_flip(thread_current()->fd_map, 2, 1, 0);
@@ -274,7 +274,7 @@ get_arg(struct intr_frame *f, int *arg, int n) {
 }
 
 void
-is_buffer_ok(const char *f){
+check_valid_string(const char *f){
   const char *p;
   for(p = f; *p != '\0'; p++) {
     if(debug_print) printf("s: %d\n", __LINE__);
